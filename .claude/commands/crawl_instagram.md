@@ -31,41 +31,67 @@ Example: `/crawl_instagram johndoe --max-users 5 --output ./data/ --username myu
 
 If `--username` and `--password` are provided, perform login before crawling:
 
-```bash
-# Open Instagram login page
-agent-browser open "https://www.instagram.com/accounts/login/" --headed --session ig_crawler_seed_{timestamp}
-agent-browser wait --load networkidle
-agent-browser snapshot -i
+**IMPORTANT: Use a dedicated session name for login (e.g., `ig_login`) to isolate from other sessions.**
 
-# Fill in login credentials
-agent-browser fill @USERNAME_INPUT "{username}"
-agent-browser fill @PASSWORD_INPUT "{password}"
-agent-browser wait 1000
+```bash
+# Open Instagram login page with dedicated login session
+agent-browser --session ig_login open "https://www.instagram.com/accounts/login/" --headed
+agent-browser --session ig_login wait --load networkidle
+agent-browser --session ig_login wait 3000
+
+# Check for and dismiss cookie consent dialog if present
+agent-browser --session ig_login snapshot -i
+# Look for "닫기" (Close) button or similar cookie consent buttons and click if found
+# Example: agent-browser --session ig_login click @CLOSE_BUTTON (if present)
+
+# Get interactive elements and identify username/password fields
+agent-browser --session ig_login snapshot -i
+# Username field: textbox containing "전화번호" or "phone" or "username" or "email"
+# Password field: textbox containing "비밀번호" or "password"
+
+# IMPORTANT: Use 'type' instead of 'fill' for more reliable input
+agent-browser --session ig_login type @USERNAME_INPUT "{username}"
+agent-browser --session ig_login type @PASSWORD_INPUT "{password}"
+agent-browser --session ig_login wait 500
+
+# Re-snapshot to get updated element references (login button ref changes after typing)
+agent-browser --session ig_login snapshot -i
+# Find the login button (로그인) - it should now be enabled (no [disabled] tag)
 
 # Click login button
-agent-browser click @LOGIN_BUTTON
-agent-browser wait --load networkidle
-agent-browser wait 3000
+agent-browser --session ig_login click @LOGIN_BUTTON
+agent-browser --session ig_login wait --load networkidle
+agent-browser --session ig_login wait 5000
 
-# Check for login success - look for profile icon or home feed elements
-agent-browser snapshot -i
-# If login fails (still on login page), report error and exit
-# If 2FA is required, report to user and wait for manual intervention
+# Verify login success by checking page content
+agent-browser --session ig_login snapshot | head -20
+# Success indicators: links containing "홈" (Home), "검색" (Search), "탐색" (Explore), "알림" (Notifications)
+# If still on login page or see error message, report failure
 
 # Save authenticated state for reuse in parallel sessions
-agent-browser state save ./instagram_auth_state.json --session ig_crawler_seed_{timestamp}
+agent-browser --session ig_login state save ./instagram_auth_state.json
+
+# Close login session after saving state
+agent-browser --session ig_login close
 ```
 
+**Login Process Notes:**
+- Always use `type` command instead of `fill` - it's more reliable for Instagram's input fields
+- Element references change dynamically when typing (e.g., "show password" button appears)
+- Re-run `snapshot -i` after filling fields to get correct login button reference
+- The login button is disabled until both fields have content
+
 **Login Success Indicators:**
-- Redirected away from /accounts/login/
-- Profile icon visible in navigation
-- Home feed or search elements present
+- Page contains navigation elements: "홈" (Home), "릴스" (Reels), "검색" (Search)
+- Links to /direct/inbox/, /explore/, /reels/ are present
+- No login form elements visible
 
 **Login Failure Handling:**
-- Wrong credentials: Report error, suggest checking credentials
-- 2FA required: Inform user, wait for manual code entry
+- Wrong credentials: Login form remains, may show error message
+- 2FA required: Inform user, wait for manual code entry in headed browser
 - Rate limited: Wait and retry with backoff
 - Suspicious login: May need manual verification in browser
+- Cookie consent: Dismiss by clicking "닫기" or close button before login
 
 ### Step 3: Initialize Output Directory
 
@@ -85,11 +111,16 @@ Create output directory structure:
 
 Use the agent-browser skill to extract seed user data AND their follower list.
 
+**IMPORTANT: Use a unique session name for the seed user (e.g., `ig_seed_{seed_username}`).**
+
 ```bash
+# Load authenticated state into seed user session
+agent-browser --session ig_seed_{seed_username} state load ./instagram_auth_state.json
+
 # Open Instagram profile
-agent-browser open "https://www.instagram.com/{seed_username}/" --headed
-agent-browser wait --load networkidle
-agent-browser snapshot -i
+agent-browser --session ig_seed_{seed_username} open "https://www.instagram.com/{seed_username}/" --headed
+agent-browser --session ig_seed_{seed_username} wait --load networkidle
+agent-browser --session ig_seed_{seed_username} snapshot -i
 ```
 
 Extract from seed user:
@@ -104,19 +135,22 @@ Save seed user data to `{output}/{seed_username}/data.json`
 From the seed user's profile, extract follower usernames:
 
 ```bash
-# Click followers count to open follower modal
-agent-browser snapshot -i
+# Click followers count to open follower modal (using seed session)
+agent-browser --session ig_seed_{seed_username} snapshot -i
 # Find and click the followers link (usually shows "X followers")
-agent-browser click @FOLLOWERS_REF
-agent-browser wait --load networkidle
+agent-browser --session ig_seed_{seed_username} click @FOLLOWERS_REF
+agent-browser --session ig_seed_{seed_username} wait --load networkidle
 
 # Scroll and collect follower usernames up to (max_users - 1)
-agent-browser snapshot -i
+agent-browser --session ig_seed_{seed_username} snapshot -i
 # Scroll to load more
-agent-browser scroll down 500
-agent-browser wait 1000
-agent-browser snapshot -i
+agent-browser --session ig_seed_{seed_username} scroll down 500
+agent-browser --session ig_seed_{seed_username} wait 1000
+agent-browser --session ig_seed_{seed_username} snapshot -i
 # Repeat until enough followers collected or end reached
+
+# Close seed session after collecting followers
+agent-browser --session ig_seed_{seed_username} close
 ```
 
 Extract follower usernames until reaching `max_users - 1` (reserving 1 for seed).
@@ -144,12 +178,14 @@ Task 3: Crawl follower_3 (depth=0, session=ig_crawler_follower3_xxx)
 ```
 
 Each parallel task should:
-1. Open a new browser session with unique session name
-2. Load saved authentication state: `agent-browser state load ./instagram_auth_state.json --session {session_name}`
-3. Navigate to the follower's Instagram profile
-4. Extract profile, posts, and comments data
+1. Create a new browser session with unique session name
+2. Load saved authentication state: `agent-browser --session {session_name} state load ./instagram_auth_state.json`
+3. Navigate to the follower's Instagram profile: `agent-browser --session {session_name} open "https://www.instagram.com/{follower_username}/" --headed`
+4. Extract profile, posts, and comments data (all commands use `--session {session_name}`)
 5. Save to individual JSON file
-6. Close browser session
+6. Close browser session: `agent-browser --session {session_name} close`
+
+**CRITICAL: Each subagent MUST use `--session` flag with a unique session name for ALL agent-browser commands to ensure browser isolation.**
 
 ### Step 7: Aggregate Results
 
@@ -209,10 +245,29 @@ This will:
 
 ## Browser Sessions
 
-- Seed user: `ig_crawler_seed_{timestamp}`
+**CRITICAL: Each browser session MUST have a unique name and ALL commands for that session must include `--session {name}` flag.**
+
+Session naming convention:
+- Login session: `ig_login`
+- Seed user: `ig_seed_{seed_username}`
 - Each follower: `ig_crawler_{follower_username}_{timestamp}`
 
-Sessions are isolated, allowing true parallel execution.
+Example session usage:
+```bash
+# Session 1: Crawling follower_a
+agent-browser --session ig_crawler_follower_a_12345 state load ./instagram_auth_state.json
+agent-browser --session ig_crawler_follower_a_12345 open "https://www.instagram.com/follower_a/" --headed
+agent-browser --session ig_crawler_follower_a_12345 snapshot -i
+agent-browser --session ig_crawler_follower_a_12345 close
+
+# Session 2 (parallel): Crawling follower_b
+agent-browser --session ig_crawler_follower_b_12345 state load ./instagram_auth_state.json
+agent-browser --session ig_crawler_follower_b_12345 open "https://www.instagram.com/follower_b/" --headed
+agent-browser --session ig_crawler_follower_b_12345 snapshot -i
+agent-browser --session ig_crawler_follower_b_12345 close
+```
+
+Sessions are isolated, allowing true parallel execution. Each session has its own browser instance.
 
 ## Error Handling
 
