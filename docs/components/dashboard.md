@@ -13,14 +13,11 @@
 ### 1.2 Layout Structure
 ```
 +---------------------------------------------------------------+
-| Header: Status (Live/Mock/Error) + Action (Export Snapshot)   |
+| Header: Influencer + Feed status + Updated time              |
 +---------------------------------------------------------------+
-| Overview: 시뮬레이션 상태/진행률/소스 정보                    |
-| Selected Influencers: 사전 선정된 후보 카드                   |
-| Simulation Snapshot: 메트릭 + 요약 정보                       |
-| Persona Trail: 에이전트별 반응 로그                           |
-| Stigmergy Signals: 연쇄 반응 요약                             |
-| Live Agent Activity: JSONL 이벤트 스트림                      |
+| Live Overview: 핵심 지표 + 예산 사용량 + 최신 활동            |
+| Multi-agent Activity Map: 액션 믹스 + 에이전트별 요약          |
+| User Personas: 시뮬레이션에 사용된 페르소나 정의               |
 +---------------------------------------------------------------+
 ```
 
@@ -66,6 +63,11 @@ UI 내부 상태는 다음 3단계만 사용한다.
 - **Index Path**: `/simulation/index.json` (선택)
 - **Cache Busting**: `?t=timestamp` 쿼리 추가
 - **Fallback**: 파일이 없거나 오류 시 Mock 데이터를 표시
+
+### 3.3 Budget usage (Optional)
+- `config.budget_total`과 `config.action_costs`가 있으면 예산 사용량을 계산해 표시한다.
+- `action_costs`가 없으면 기본 비용 테이블(좋아요/댓글/팔로우 등)을 사용한다.
+- JSONL 이벤트가 없으면 `metrics.actions` 값을 기준으로 예산을 계산한다.
 
 ---
 

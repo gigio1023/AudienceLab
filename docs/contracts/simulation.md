@@ -47,6 +47,9 @@ interface SimulationResult {
   config: {
     post_description: string;
     agent_count: number;
+    budget_total?: number;   // total marketing budget
+    budget_unit?: string;    // e.g. USD, KRW, credits
+    action_costs?: Record<string, number>; // per-action cost map
   };
   agents: AgentResult[];
   metrics: {

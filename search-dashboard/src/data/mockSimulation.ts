@@ -7,7 +7,18 @@ export const mockSimulation: SimulationResult = {
   createdAt: "2025-10-03T14:42:00Z",
   config: {
     post_description: "Eco skincare launch with soft-spoken, urban wellness tone.",
-    agent_count: 42
+    agent_count: 42,
+    budget_total: 12000,
+    budget_unit: "USD",
+    action_costs: {
+      like: 1,
+      comment: 3,
+      follow: 5,
+      share: 2,
+      explore: 1,
+      scroll: 0.5,
+      skip: 0
+    }
   },
   agents: [
     {

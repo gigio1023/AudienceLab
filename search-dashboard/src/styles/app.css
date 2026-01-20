@@ -128,6 +128,11 @@
   color: var(--text-muted);
 }
 
+.progress-meta--subtle {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
 .progress-bar {
   height: 6px;
   background: var(--bg-deep);

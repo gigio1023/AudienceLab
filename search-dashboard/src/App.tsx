@@ -10,6 +10,17 @@ const influencer = {
 };
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
+const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const formatNumber = (value: number) => numberFormatter.format(value);
+const defaultActionCosts: Record<string, number> = {
+  like: 1,
+  comment: 3,
+  follow: 5,
+  share: 2,
+  explore: 1,
+  scroll: 0.5,
+  skip: 0
+};
 
 export default function App() {
   const simulationId = import.meta.env.VITE_SIMULATION_ID ?? "latest";
@@ -69,6 +80,23 @@ export default function App() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6);
   const activeAgentCount = agentSummaries.length;
+  const actionCountsForBudget = activityEvents.length ? actionTotals : simulation.metrics.actions;
+  const actionCosts = {
+    ...defaultActionCosts,
+    ...(simulation.config.action_costs ?? {})
+  };
+  const budgetTotal = simulation.config.budget_total ?? 0;
+  const budgetUnit = simulation.config.budget_unit ?? "credits";
+  const budgetUsedRaw = Object.entries(actionCountsForBudget).reduce((sum, [action, count]) => {
+    const cost = actionCosts[action] ?? 1;
+    return sum + cost * count;
+  }, 0);
+  const budgetUsed = budgetTotal ? Math.min(budgetUsedRaw, budgetTotal) : budgetUsedRaw;
+  const budgetRatio = budgetTotal ? Math.min(1, budgetUsed / budgetTotal) : 0;
+  const budgetLabel = budgetTotal
+    ? `${formatNumber(budgetUsed)} / ${formatNumber(budgetTotal)} ${budgetUnit}`
+    : `${formatNumber(budgetUsed)} ${budgetUnit}`;
+  const budgetPercentLabel = budgetTotal ? `${(budgetRatio * 100).toFixed(1)}%` : "n/a";
   const statCards = [
     {
       label: "Positive rate",
@@ -145,11 +173,15 @@ export default function App() {
           </div>
           <div className="progress-row">
             <div className="progress-meta">
-              <span>Completion</span>
-              <span>{simulation.progress}%</span>
+              <span>Budget used</span>
+              <span>{budgetLabel}</span>
             </div>
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${simulation.progress}%` }} />
+              <div className="progress-fill" style={{ width: `${budgetRatio * 100}%` }} />
+            </div>
+            <div className="progress-meta progress-meta--subtle">
+              <span>{budgetPercentLabel} of budget</span>
+              <span>{activityEvents.length ? activityEvents.length : "no"} live actions</span>
             </div>
           </div>
           <div className="activity-summary">

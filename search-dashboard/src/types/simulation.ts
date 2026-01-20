@@ -6,6 +6,9 @@ export interface SimulationResult {
   config: {
     post_description: string;
     agent_count: number;
+    budget_total?: number;
+    budget_unit?: string;
+    action_costs?: Record<string, number>;
   };
   agents: AgentResult[];
   metrics: {
