@@ -78,7 +78,7 @@ npm run dev
 # 4) Run Simulation (Terminal 3)
 cd ../agent
 uv sync
-uv run python cli.py run --crowd-count 8 --max-concurrency 4
+uv run python local_agent.py
 
 # 5) (Optional) Deploy logs to dashboard feed
 python ../scripts/deploy_dashboard_data.py
