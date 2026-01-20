@@ -1,3 +1,7 @@
+---
+description: Crawl Instagram user activity data using BFS traversal from a seed user.
+---
+
 # Instagram BFS Crawler
 
 Crawl Instagram user activity data using BFS traversal from a seed user.
@@ -11,8 +15,6 @@ Crawl Instagram user activity data using BFS traversal from a seed user.
 - `max_users`: 10 (maximum number of users to crawl including seed)
 - `output`: `./instagram_crawl_results/` (output directory)
 - `depth`: 1 (fixed - seed user + their followers)
-- `username`: (optional) Instagram login username/email
-- `password`: (optional) Instagram login password
 
 ## Workflow
 
@@ -27,172 +29,112 @@ Parse the input arguments:
 
 Example: `/crawl_instagram johndoe --max-users 5 --output ./data/ --username myuser@email.com --password mypassword`
 
-### Step 2: Instagram Login (if credentials provided)
+### Step 2: Initialize Output Directory
 
-If `--username` and `--password` are provided, perform login before crawling:
-
-**IMPORTANT: Use a dedicated session name for login (e.g., `ig_login`) to isolate from other sessions.**
-
+Create output directory using Bash:
 ```bash
-# Open Instagram login page with dedicated login session
-agent-browser --session ig_login open "https://www.instagram.com/accounts/login/" --headed
-agent-browser --session ig_login wait --load networkidle
-agent-browser --session ig_login wait 3000
-
-# Check for and dismiss cookie consent dialog if present
-agent-browser --session ig_login snapshot -i
-# Look for "닫기" (Close) button or similar cookie consent buttons and click if found
-# Example: agent-browser --session ig_login click @CLOSE_BUTTON (if present)
-
-# Get interactive elements and identify username/password fields
-agent-browser --session ig_login snapshot -i
-# Username field: textbox containing "전화번호" or "phone" or "username" or "email"
-# Password field: textbox containing "비밀번호" or "password"
-
-# IMPORTANT: Use 'type' instead of 'fill' for more reliable input
-agent-browser --session ig_login type @USERNAME_INPUT "{username}"
-agent-browser --session ig_login type @PASSWORD_INPUT "{password}"
-agent-browser --session ig_login wait 500
-
-# Re-snapshot to get updated element references (login button ref changes after typing)
-agent-browser --session ig_login snapshot -i
-# Find the login button (로그인) - it should now be enabled (no [disabled] tag)
-
-# Click login button
-agent-browser --session ig_login click @LOGIN_BUTTON
-agent-browser --session ig_login wait --load networkidle
-agent-browser --session ig_login wait 5000
-
-# Verify login success by checking page content
-agent-browser --session ig_login snapshot | head -20
-# Success indicators: links containing "홈" (Home), "검색" (Search), "탐색" (Explore), "알림" (Notifications)
-# If still on login page or see error message, report failure
-
-# Save authenticated state for reuse in parallel sessions
-agent-browser --session ig_login state save ./instagram_auth_state.json
-
-# Close login session after saving state
-agent-browser --session ig_login close
+mkdir -p {output}/{seed_username}
 ```
 
-**Login Process Notes:**
-- Always use `type` command instead of `fill` - it's more reliable for Instagram's input fields
-- Element references change dynamically when typing (e.g., "show password" button appears)
-- Re-run `snapshot -i` after filling fields to get correct login button reference
-- The login button is disabled until both fields have content
+### Step 3: Instagram Login (if credentials provided)
 
-**Login Success Indicators:**
-- Page contains navigation elements: "홈" (Home), "릴스" (Reels), "검색" (Search)
-- Links to /direct/inbox/, /explore/, /reels/ are present
-- No login form elements visible
+If `--username` and `--password` are provided, perform login using Playwright MCP:
 
-**Login Failure Handling:**
-- Wrong credentials: Login form remains, may show error message
-- 2FA required: Inform user, wait for manual code entry in headed browser
-- Rate limited: Wait and retry with backoff
-- Suspicious login: May need manual verification in browser
-- Cookie consent: Dismiss by clicking "닫기" or close button before login
+1. Navigate to login page:
+   - Use `browser_navigate` to open `https://www.instagram.com/accounts/login/`
 
-### Step 3: Initialize Output Directory
+2. Wait for page load and dismiss cookie consent if present:
+   - Use `browser_snapshot` to get page state
+   - If cookie dialog exists, use `browser_click` on close/accept button
 
-Create output directory structure:
-```
-{output}/
-├── seed_user/
-│   └── data.json
-├── follower_1/
-│   └── data.json
-├── follower_2/
-│   └── data.json
-└── crawl_summary.json
-```
+3. Fill login form:
+   - Use `browser_snapshot` to identify form elements
+   - Use `browser_type` for username field (look for input with "phone", "username", or "email" placeholder)
+   - Use `browser_type` for password field (look for input with "password" placeholder)
 
-### Step 4: Crawl Seed User (Depth 1)
+4. Submit login:
+   - Use `browser_click` on the login button (로그인/Log in)
+   - Use `browser_wait` for navigation to complete
 
-Use the agent-browser skill to extract seed user data AND their follower list.
+5. Verify login success:
+   - Use `browser_snapshot` to check for navigation elements (Home, Search, Explore)
+   - If login fails or 2FA required, report to user
 
-**IMPORTANT: Use a unique session name for the seed user (e.g., `ig_seed_{seed_username}`).**
+### Step 4: Crawl Seed User
 
-```bash
-# Load authenticated state into seed user session
-agent-browser --session ig_seed_{seed_username} state load ./instagram_auth_state.json
+Navigate to seed user's profile and extract data:
 
-# Open Instagram profile
-agent-browser --session ig_seed_{seed_username} open "https://www.instagram.com/{seed_username}/" --headed
-agent-browser --session ig_seed_{seed_username} wait --load networkidle
-agent-browser --session ig_seed_{seed_username} snapshot -i
-```
+1. Navigate to profile:
+   - Use `browser_navigate` to open `https://www.instagram.com/{seed_username}/`
 
-Extract from seed user:
-1. **Profile info**: name, bio, follower/following counts
-2. **Posts**: Recent posts with captions, likes, comments
-3. **Follower list**: Click followers link and scroll to collect usernames
+2. Extract profile info:
+   - Use `browser_snapshot` to get page content
+   - Parse: display name, bio, follower count, following count, post count, verification status
 
-Save seed user data to `{output}/{seed_username}/data.json`
+3. Extract recent posts (up to 12):
+   - Use `browser_snapshot` to find post thumbnails
+   - For each post:
+     - Use `browser_click` to open post modal
+     - Use `browser_snapshot` to extract caption, like count, comment count
+     - **Extract comments**: Scroll within modal to load comments, capture commenter usernames and text
+     - **Extract likers**: Click on "likes" count to open likers modal, scroll to collect usernames
+     - Use `browser_press_key` with "Escape" to close modal
+
+4. Save seed user data to `{output}/{seed_username}/data.json`
 
 ### Step 5: Collect Follower Usernames
 
-From the seed user's profile, extract follower usernames:
+From the seed user's profile:
 
-```bash
-# Click followers count to open follower modal (using seed session)
-agent-browser --session ig_seed_{seed_username} snapshot -i
-# Find and click the followers link (usually shows "X followers")
-agent-browser --session ig_seed_{seed_username} click @FOLLOWERS_REF
-agent-browser --session ig_seed_{seed_username} wait --load networkidle
+1. Open followers modal:
+   - Use `browser_snapshot` to find followers link
+   - Use `browser_click` on followers count
 
-# Scroll and collect follower usernames up to (max_users - 1)
-agent-browser --session ig_seed_{seed_username} snapshot -i
-# Scroll to load more
-agent-browser --session ig_seed_{seed_username} scroll down 500
-agent-browser --session ig_seed_{seed_username} wait 1000
-agent-browser --session ig_seed_{seed_username} snapshot -i
-# Repeat until enough followers collected or end reached
+2. Scroll and collect usernames:
+   - Use `browser_snapshot` to get visible followers
+   - Use `browser_scroll` to load more followers
+   - Repeat until `max_users - 1` followers collected
 
-# Close seed session after collecting followers
-agent-browser --session ig_seed_{seed_username} close
-```
+3. Close modal:
+   - Use `browser_press_key` with "Escape"
 
-Extract follower usernames until reaching `max_users - 1` (reserving 1 for seed).
+### Step 6: Parallel Follower Crawling
 
-### Step 6: Parallel Follower Extraction
-
-For each follower, launch a parallel subagent using the Task tool:
+For each collected follower, spawn a parallel Task agent:
 
 ```
-IMPORTANT: Use the Task tool to spawn parallel agents for each follower.
-Each subagent should:
-1. Use a unique session name: ig_crawler_{username}_{timestamp}
-2. Execute with depth=0 (extract only that user, no further followers)
-3. Follow the instagram-user-crawler agent workflow
-4. Save results to {output}/{follower_username}/data.json
+Use the Task tool with:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt: Include the following instructions for the agent:
+  1. Username to crawl
+  2. Output path for results
+  3. Reference to instagram-user-crawler agent workflow
+  4. Use Playwright MCP tools for all browser operations
 ```
 
-**Parallel Execution Pattern:**
+**Parallel Task Pattern:**
 
+Launch multiple Task tools in parallel (up to 3-5 concurrent):
 ```
-Task 1: Crawl follower_1 (depth=0, session=ig_crawler_follower1_xxx)
-Task 2: Crawl follower_2 (depth=0, session=ig_crawler_follower2_xxx)
-Task 3: Crawl follower_3 (depth=0, session=ig_crawler_follower3_xxx)
+Task 1: Crawl follower_1 using Playwright MCP
+Task 2: Crawl follower_2 using Playwright MCP
+Task 3: Crawl follower_3 using Playwright MCP
 ...
 ```
 
 Each parallel task should:
-1. Create a new browser session with unique session name
-2. Load saved authentication state: `agent-browser --session {session_name} state load ./instagram_auth_state.json`
-3. Navigate to the follower's Instagram profile: `agent-browser --session {session_name} open "https://www.instagram.com/{follower_username}/" --headed`
-4. Extract profile, posts, and comments data (all commands use `--session {session_name}`)
-5. Save to individual JSON file
-6. Close browser session: `agent-browser --session {session_name} close`
-
-**CRITICAL: Each subagent MUST use `--session` flag with a unique session name for ALL agent-browser commands to ensure browser isolation.**
+1. Navigate to follower's Instagram profile using `browser_navigate`
+2. Extract profile data using `browser_snapshot`
+3. Extract posts data
+4. Save to `{output}/{follower_username}/data.json`
 
 ### Step 7: Aggregate Results
 
-After all parallel crawls complete, create summary:
+After all crawls complete, create summary:
 
 ```json
-// crawl_summary.json
+// {output}/crawl_summary.json
 {
   "seed_user": "johndoe",
   "crawl_timestamp": "2024-01-20T10:30:00Z",
@@ -217,6 +159,19 @@ After all parallel crawls complete, create summary:
 }
 ```
 
+## Playwright MCP Tools Reference
+
+| Tool | Purpose |
+|------|---------|
+| `browser_navigate` | Navigate to URL |
+| `browser_snapshot` | Get page accessibility tree (for finding elements) |
+| `browser_click` | Click an element by reference |
+| `browser_type` | Type text into an element |
+| `browser_scroll` | Scroll page (up/down) |
+| `browser_press_key` | Press keyboard key (Escape, Enter, etc.) |
+| `browser_screenshot` | Take screenshot (for debugging) |
+| `browser_wait` | Wait for time or element |
+
 ## Example Usage
 
 ### Without authentication (public profiles only):
@@ -224,59 +179,24 @@ After all parallel crawls complete, create summary:
 /crawl_instagram techguru --max-users 5 --output ./crawl_data/
 ```
 
-### With authentication (recommended for full access):
+### With authentication (recommended):
 ```
 /crawl_instagram techguru --max-users 5 --output ./crawl_data/ --username myemail@example.com --password mypassword123
 ```
 
-This will:
-1. Login to Instagram (if credentials provided)
-2. Crawl `techguru`'s profile (seed user)
-3. Get up to 4 of `techguru`'s followers
-4. Crawl each follower's profile in parallel (using saved auth state)
-5. Save all results to `./crawl_data/`
-
 ## Rate Limiting & Safety
 
-- Add delays between requests (2-5 seconds)
-- Use `agent-browser wait` commands liberally
-- If rate limited, pause and retry
+- Add 2-5 second delays between actions using `browser_wait`
+- If rate limited, pause and retry with exponential backoff
 - Respect Instagram's terms of service
-
-## Browser Sessions
-
-**CRITICAL: Each browser session MUST have a unique name and ALL commands for that session must include `--session {name}` flag.**
-
-Session naming convention:
-- Login session: `ig_login`
-- Seed user: `ig_seed_{seed_username}`
-- Each follower: `ig_crawler_{follower_username}_{timestamp}`
-
-Example session usage:
-```bash
-# Session 1: Crawling follower_a
-agent-browser --session ig_crawler_follower_a_12345 state load ./instagram_auth_state.json
-agent-browser --session ig_crawler_follower_a_12345 open "https://www.instagram.com/follower_a/" --headed
-agent-browser --session ig_crawler_follower_a_12345 snapshot -i
-agent-browser --session ig_crawler_follower_a_12345 close
-
-# Session 2 (parallel): Crawling follower_b
-agent-browser --session ig_crawler_follower_b_12345 state load ./instagram_auth_state.json
-agent-browser --session ig_crawler_follower_b_12345 open "https://www.instagram.com/follower_b/" --headed
-agent-browser --session ig_crawler_follower_b_12345 snapshot -i
-agent-browser --session ig_crawler_follower_b_12345 close
-```
-
-Sessions are isolated, allowing true parallel execution. Each session has its own browser instance.
 
 ## Error Handling
 
-- Private profiles: Mark as "private" in summary, skip extraction
-- Rate limits: Pause, wait, retry with backoff
-- Login walls: Use `--username` and `--password` to authenticate
-- Authentication failures: Report error with reason (wrong credentials, 2FA required, etc.)
-- 2FA required: Pause and inform user, wait for manual code entry in headed browser
-- Network errors: Retry up to 3 times
+- **Private profiles**: Mark as "private" in summary, skip extraction
+- **Rate limits**: Pause, wait, retry with backoff
+- **Login walls**: Require `--username` and `--password` for authenticated access
+- **2FA required**: Pause and inform user
+- **Network errors**: Retry up to 3 times
 
 ## Output Schema
 
@@ -297,26 +217,26 @@ Each user's `data.json`:
   },
   "posts": [
     {
-      "id": "string",
       "url": "string",
       "type": "image|video|carousel",
       "caption": "string",
       "like_count": "number",
       "comment_count": "number",
-      "timestamp": "ISO8601"
-    }
-  ],
-  "comments_made": [
-    {
-      "post_url": "string",
-      "text": "string",
-      "timestamp": "ISO8601"
-    }
-  ],
-  "likes_given": [
-    {
-      "post_url": "string",
-      "timestamp": "ISO8601"
+      "timestamp": "ISO8601",
+      "likers": [
+        {
+          "username": "string",
+          "display_name": "string"
+        }
+      ],
+      "comments": [
+        {
+          "username": "string",
+          "text": "string",
+          "timestamp": "ISO8601",
+          "like_count": "number"
+        }
+      ]
     }
   ]
 }

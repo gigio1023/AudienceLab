@@ -1,106 +1,133 @@
+---
+name: instagram-user-crawler
+description: Extracts Instagram user profile and posts data using Playwright MCP
+tools: Read, Write, Glob, Grep, Bash
+model: sonnet
+---
+
 # Instagram User Crawler Agent
 
-This agent extracts Instagram user activity data (posts, comments, likes) for a single user.
+Extracts Instagram user profile and posts data for a single user using Playwright MCP tools.
 
 ## Input Parameters
 
-The agent receives:
+The agent receives via prompt:
 - `username`: Instagram username to crawl
-- `depth`: Current depth (0 = extract this user only, no followers)
-- `session_name`: Browser session name for isolation
+- `output_path`: Directory to save results
 
 ## Workflow
 
-### 1. Initialize Browser Session
+### 1. Navigate to Profile
 
-```bash
-agent-browser --session $SESSION_NAME open "https://www.instagram.com/$USERNAME/" --headed
-agent-browser --session $SESSION_NAME wait --load networkidle
+```
+Use browser_navigate to open: https://www.instagram.com/{username}/
 ```
 
-### 2. Extract User Profile Data
+### 2. Check Profile Accessibility
 
-Take a snapshot and extract basic profile info:
-```bash
-agent-browser --session $SESSION_NAME snapshot -i
+Use `browser_snapshot` to analyze the page:
+
+- **Private profile**: Look for "This account is private" text
+- **Not found**: Look for "Sorry, this page isn't available" text
+- **Public profile**: Proceed with extraction
+
+If private or not found, save minimal data and exit:
+```json
+{
+  "username": "{username}",
+  "crawled_at": "ISO8601",
+  "profile": {
+    "is_private": true,
+    "is_accessible": false
+  },
+  "posts": []
+}
 ```
 
-Extract:
-- Profile name
-- Bio
-- Follower count
-- Following count
-- Post count
+### 3. Extract Profile Data
 
-### 3. Extract Recent Posts
+From `browser_snapshot` output, extract:
 
-Scroll through the user's posts and extract:
-- Post URLs
-- Post captions
-- Like counts
-- Comment counts
-- Post dates
+| Field | Location |
+|-------|----------|
+| display_name | Header section, usually the first heading |
+| bio | Text below the display name |
+| follower_count | Link containing "followers" |
+| following_count | Link containing "following" |
+| post_count | Text showing "X posts" |
+| is_verified | Look for verified badge icon |
 
-```bash
-# Click on first post
-agent-browser --session $SESSION_NAME snapshot -i
-# Find and click post thumbnails
-agent-browser --session $SESSION_NAME click @POST_REF
-agent-browser --session $SESSION_NAME wait --load networkidle
+### 4. Extract Recent Posts
 
-# Extract post details
-agent-browser --session $SESSION_NAME snapshot -i
-agent-browser --session $SESSION_NAME get text @CAPTION_REF
-agent-browser --session $SESSION_NAME get text @LIKES_REF
-agent-browser --session $SESSION_NAME get text @COMMENTS_REF
+1. Use `browser_snapshot` to find post grid
+2. For up to 12 posts, iterate:
 
-# Navigate to next post or close modal
-agent-browser --session $SESSION_NAME press Escape
-```
+   a. Click post thumbnail:
+   ```
+   Use browser_click on post element reference
+   ```
 
-### 4. Extract Comments (for each post)
+   b. Extract post details from modal:
+   ```
+   Use browser_snapshot to get:
+   - Post URL (from browser location or link)
+   - Caption text
+   - Like count (e.g., "X likes")
+   - Comment count
+   - Timestamp
+   ```
 
-When inside a post modal:
-```bash
-# Scroll to load more comments
-agent-browser --session $SESSION_NAME scroll down 500
-agent-browser --session $SESSION_NAME snapshot -i
+   c. **Extract comments** (up to 20 per post):
+   ```
+   - Use browser_snapshot to find comments section
+   - If "View all X comments" link exists, click it
+   - Use browser_scroll within the comments area to load more
+   - For each comment, extract:
+     - Commenter username
+     - Comment text
+     - Timestamp (if visible)
+     - Like count on comment (if visible)
+   - Repeat scroll + snapshot until enough comments collected
+   ```
 
-# Extract comment data
-# - Commenter username
-# - Comment text
-# - Comment timestamp
-```
+   d. **Extract likers** (up to 50 per post):
+   ```
+   - Use browser_click on the likes count (e.g., "1,234 likes")
+   - Use browser_snapshot to get likers modal
+   - For each liker, extract:
+     - Username
+     - Display name
+   - Use browser_scroll to load more likers
+   - Repeat until enough likers collected or end reached
+   - Use browser_press_key "Escape" to close likers modal
+   ```
 
-### 5. Extract Followers (if depth > 0)
+   e. Close post modal:
+   ```
+   Use browser_press_key with "Escape"
+   ```
 
-If `depth > 0`, extract follower list for BFS traversal:
+   f. Wait before next action:
+   ```
+   Use browser_wait for 1-2 seconds
+   ```
 
-```bash
-# Click on followers count
-agent-browser --session $SESSION_NAME snapshot -i
-agent-browser --session $SESSION_NAME click @FOLLOWERS_LINK_REF
-agent-browser --session $SESSION_NAME wait --load networkidle
+### 5. Save Results
 
-# Scroll and collect follower usernames
-agent-browser --session $SESSION_NAME snapshot -i
-# Repeat scrolling to load more followers
-agent-browser --session $SESSION_NAME scroll down 500
-```
-
-### 6. Output Format
-
-Return extracted data as JSON:
+Write extracted data to `{output_path}/{username}/data.json`:
 
 ```json
 {
   "username": "target_user",
+  "crawled_at": "2024-01-20T10:30:00Z",
   "profile": {
     "display_name": "Display Name",
     "bio": "User bio text",
     "follower_count": 1234,
     "following_count": 567,
-    "post_count": 89
+    "post_count": 89,
+    "is_private": false,
+    "is_verified": false
   },
   "posts": [
     {
@@ -108,51 +135,110 @@ Return extracted data as JSON:
       "caption": "Post caption...",
       "like_count": 100,
       "comment_count": 25,
-      "timestamp": "2024-01-15"
+      "timestamp": "2024-01-15",
+      "likers": [
+        {
+          "username": "liker1",
+          "display_name": "Liker One"
+        },
+        {
+          "username": "liker2",
+          "display_name": "Liker Two"
+        }
+      ],
+      "comments": [
+        {
+          "username": "commenter1",
+          "text": "Great post!",
+          "timestamp": "2024-01-15T12:00:00Z",
+          "like_count": 5
+        },
+        {
+          "username": "commenter2",
+          "text": "Love this!",
+          "timestamp": "2024-01-15T13:30:00Z",
+          "like_count": 2
+        }
+      ]
     }
-  ],
-  "comments": [
-    {
-      "post_url": "https://instagram.com/p/ABC123",
-      "commenter": "other_user",
-      "text": "Comment text",
-      "timestamp": "2024-01-15"
-    }
-  ],
-  "followers": ["follower1", "follower2", "..."]  // Only if depth > 0
+  ]
 }
 ```
 
-### 7. Cleanup
+## Playwright MCP Tools Usage
 
-```bash
-agent-browser --session $SESSION_NAME close
+### browser_navigate
+Navigate to a URL.
+```
+url: "https://www.instagram.com/{username}/"
+```
+
+### browser_snapshot
+Get page accessibility tree for element identification.
+Returns element references (e.g., `ref="e123"`) to use with other tools.
+
+### browser_click
+Click an element by reference.
+```
+element: "e123"  // reference from snapshot
+```
+
+### browser_type
+Type text into a focused input.
+```
+text: "content to type"
+```
+
+### browser_press_key
+Press a keyboard key.
+```
+key: "Escape"  // or "Enter", "Tab", etc.
+```
+
+### browser_scroll
+Scroll the page.
+```
+direction: "down"  // or "up"
+amount: 500  // pixels
+```
+
+### browser_wait
+Wait for time or condition.
+```
+time: 2000  // milliseconds
 ```
 
 ## Error Handling
 
-- If login is required, the agent should detect and report login requirement
-- If rate limited, wait and retry with exponential backoff
-- If profile is private, mark as private and skip extraction
+| Error | Action |
+|-------|--------|
+| Login required | Return error status, suggest using authenticated session |
+| Rate limited | Wait 30s and retry up to 3 times |
+| Element not found | Log warning, continue with available data |
+| Network error | Retry up to 3 times with backoff |
 
-## Session Isolation
+## Example Task Invocation
 
-Each agent instance uses a unique session name to allow parallel execution:
-- Session naming convention: `ig_crawler_{username}_{timestamp}`
-- Sessions are isolated and do not interfere with each other
-
-## Usage Example
-
-This agent is called by the main `/crawl_instagram` command:
+When called from the parent `/crawl_instagram` command:
 
 ```
-# For depth 0 (extract single user only)
-Extract Instagram data for user: johndoe
-Depth: 0
-Session: ig_crawler_johndoe_1705123456
+Task tool parameters:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt: |
+    Crawl Instagram user profile using Playwright MCP tools.
 
-# For depth 1 (extract user + get follower list for parent to process)
-Extract Instagram data for user: seeduser
-Depth: 1
-Session: ig_crawler_seeduser_1705123456
+    Username: johndoe
+    Output path: ./instagram_crawl_results/
+
+    Follow the instagram-user-crawler agent workflow:
+    1. Use browser_navigate to open https://www.instagram.com/johndoe/
+    2. Use browser_snapshot to extract profile data
+    3. Extract recent posts by clicking thumbnails and reading modals
+    4. For each post, extract:
+       - Comments: Click "View all comments", scroll and collect up to 20
+       - Likers: Click likes count, scroll and collect up to 50 usernames
+    5. Save results to ./instagram_crawl_results/johndoe/data.json
+
+    Use browser_wait between actions to avoid rate limiting.
 ```
