@@ -210,5 +210,65 @@
     {
         "follower": "agent15",
         "following": "mens_style_hero"
+    },
+    {
+        "follower": "agent1",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent2",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent3",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent4",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent5",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent6",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent7",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent8",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent9",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent10",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent11",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent12",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent13",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent14",
+        "following": "laser_sun"
+    },
+    {
+        "follower": "agent15",
+        "following": "laser_sun"
     }
 ]
