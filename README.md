@@ -1,39 +1,36 @@
-# AudienceLab
+# 팀명
 
-> A local-first, persona-driven swarm simulator for influencer campaign planning. It mirrors real engagement patterns on a local SNS, logs outcomes to shared contracts, and renders results in a live dashboard.
+AudienceLab
 
-## Why it exists
+## 데모
 
-Influencer campaigns are expensive to validate. Teams need a fast, repeatable way to compare shortlisted creators using realistic engagement signals **before** spending budget. AudienceLab provides a closed-loop simulation that turns real Instagram-derived context into structured, comparable metrics.
+(데모 URL 또는 영상 링크)
 
-## What it does
+## 문제 정의
 
-- Builds persona-driven agents from real or templated audience signals
-- Simulates likes, comments, and follows on a local SNS
-- Produces normalized engagement metrics and per-agent action logs
-- Streams outputs to a dashboard for review and comparison
+- 기존 솔루션들은 인플루언서 검색, 분석을 지원하나 그 깊이가 한정적입니다. 검색은 카테고리나 팔로워 수 등 메타데이터 기반이고, 분석은 협업 브랜드 히스토리 정도를 알려줍니다. 저희는 인플루언서의 힘이 팔로워에서 온다고 생각하고, 팔로워에 대한 인사이트를 고객에게 전달함으로써 더 적합한 인플루언서를 선택할 수 있도록 도울 것입니다.
 
-## Closed-Loop Flow (Data → Persona → Simulation → Metrics)
+## 솔루션
 
-1. **Instagram data (Tier 1+)** informs influencer and audience context
-2. **Persona builder** produces audience personas (Tier 2+ if comments exist)
-3. **Swarm simulation** runs persona agents on a local SNS
-4. **Metrics** are aggregated and normalized
-5. **Dashboard** ranks candidates and explains why
+- 문제 해결을 위해 인플루언서 팔로워 별로 페스소나를 구축할 것입니다. ~이 페르소나를 활용하면 LLM이나 벡터 검색으로 인플루언서를 분석할 수 있습니다.~(구현 안됨) 또한 페르소나로 AI Agent를 구축하면, 가상 마케팅을 집행했을 때 가상 팔로워가 어떻게 행동하는지 multi-agent simulation이 가능합니다. 이는 ML 예측 모델이 pClick, pCVR 등을 알려주는 것을 넘어선 고맥락의 정보입니다. 시뮬레이션 후 engagement 지표(e.g. like, comment 갯수)를 측정하고, 그것을 인플루언서의 전체 포스팅 engagement와 비교하여 마케팅 성과를 측정할 수 있습니다.
 
-## Swarm Model
+## 조건 충족 여부
 
-All agents share the same behavior model. The only difference between agents is whether they run **headed** (visible browser) or **headless** (no UI). This keeps the swarm consistent while allowing visual debugging when needed.
+- [x] OpenAI API 사용
+- [x] 멀티에이전트 구현
+- [ ] 실행 가능한 데모
 
-## Architecture
+## 아키텍처
 
 ```
-Persona seeds (sns-vibe/seeds/personas.json)
+Persona/Seed Data (sns-vibe/seeds.json)
         |
         v
-Agent CLI (agent/cli.py)
-  - Swarm agents (Playwright + OpenAI; headed or headless)
-        |
+agent/cli.py
+  -> agent/runner.py (Python + Playwright + OpenAI)
+        |                         |
+        |                         v
+        |                   OpenAI API
         v
 Local SNS (sns-vibe: SvelteKit + SQLite)
         |
@@ -41,36 +38,23 @@ Local SNS (sns-vibe: SvelteKit + SQLite)
 Outputs
   - shared/simulation/{simulationId}.json
   - agent/outputs/{runId}/{agentId}/actions.jsonl
-  - (dashboard feed) search-dashboard/public/simulation/*.jsonl
-        |
+  - (optional) search-dashboard/public/simulation/*.jsonl
+        |                              |
+        |                              v
+        |                        Search Dashboard (React/Vite)
         v
-Search Dashboard (React + Vite)
-  - polls /simulation/{id}.json + /simulation/index.json
-        |
-        v
-Evaluation (eval-agent)
-  - reads JSONL logs + sns-vibe seed posts
-  - LLM judge (gpt-5-mini) for comment quality
+eval-agent -> shared/evaluation/results/{evaluationId}.json
 ```
 
-## Repo Structure
+## 기술 스택
 
-- `agent/` — persona-based browser agents (Playwright + OpenAI)
-- `sns-vibe/` — local SNS sandbox (SvelteKit + SQLite)
-- `search-dashboard/` — simulation + reporting UI (React + Vite)
-- `shared/` — simulation contract and outputs
-- `eval-agent/` — offline evaluation on JSONL logs
-- `docs/` — deep dives, strategy, troubleshooting
+- Agent/Simulation: Python 3.12+, OpenAI API, Playwright, uv, Jinja2, Loguru
+- Local SNS: SvelteKit + TypeScript, TailwindCSS, SQLite (better-sqlite3), Docker
+- Dashboard: React 18 + TypeScript, Vite, motion
+- Evaluation: Python, pandas, pydantic, OpenAI API
+- Contracts: JSON Schema (shared/)
 
-## Demo Ports
-
-Local demo (default dev ports):
-- SNS: http://localhost:51737
-- Dashboard: http://localhost:51730
-
-Ports are configured in each `package.json`, so you do not need to pass explicit port flags when starting the dev servers.
-
-## Quick Start
+## 설치 및 실행
 
 ```bash
 # 1) Configure agent env
@@ -105,53 +89,14 @@ uv sync
 uv run python evaluate.py
 ```
 
-## Output Contracts
+## 향후 계획 (Optional)
 
-- **Simulation state**: `shared/simulation/{simulationId}.json`
-- **Per-agent action logs**: `agent/outputs/{runId}/{agentId}/actions.jsonl`
-- **Dashboard feed**: `search-dashboard/public/simulation/*.jsonl`
+- 인플루언서 검색을 지원해서 검색->가상마케팅 시나리오를 지원할 계획입니다.
 
-See `shared/simulation-schema.json` for the contract.
+## 팀원
 
-## Evaluation Summary
-
-Evaluation is implemented in `eval-agent/` and operates on action logs from `search-dashboard/public/simulation/*.jsonl`:
-
-- **Quantitative metrics**
-  - Engagement Rate = successful (like/comment/follow) / total steps
-  - Marketing Engagement Rate = successful (like/comment) on marketing-tagged seed posts / total steps
-  - Action distribution by type and success
-- **Qualitative metrics (LLM judge)**
-  - Uses `gpt-5-mini` to score comments on relevance, tone, and consistency
-  - Produces average quality scores and a human-readable verdict
-
-Output is summarized in `eval-agent/evaluation_report.md`.
-
-## Cost Notes (GPT-5 mini)
-
-Each step calls the model with:
-- A system prompt (persona + rules)
-- A user prompt containing current page content
-
-Rule-of-thumb estimate per step:
-- Input: ~1.2k-1.8k tokens
-- Output: ~60-120 tokens
-
-Example (default 9 agents x 35 steps = 315 steps):
-- ~`$0.13 - $0.22` total (typical range)
-
-## Troubleshooting Quick Hits
-
-- **SNS not reachable**: confirm `SNS_URL`, then restart `sns-vibe`.
-- **Playwright missing**: `uv run playwright install chromium`.
-- **Slow runs**: reduce `--crowd-count` or `--max-concurrency`.
-
-## Roadmap (Short)
-
-- Stream `shared/simulation/{id}.json` directly into the dashboard
-- Multi-run comparison and exportable reports
-- WebSocket progress updates
-
-## License
-
-Hackathon project. Local-first demo focus.
+| 이름 | 역할 |
+| ---- | ---- |
+| 박성호 | 시뮬레이션, sns 개발 |
+| 이승현 | 크롤링 개발 |
+|      |      |
