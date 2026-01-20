@@ -102,6 +102,12 @@ def pick_session_intent(persona: Persona) -> str:
     return random.choice(SESSION_INTENTS)
 
 
+def safe_slug(value: str) -> str:
+    """Normalize a value for filenames."""
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", (value or "").strip().lower()).strip("-")
+    return cleaned or "unknown"
+
+
 def load_mcp_config() -> MCPConfig:
     """Load MCP configuration from environment."""
     agent_dir = Path(__file__).resolve().parent
@@ -396,8 +402,10 @@ class MCPAgentRunner:
         self.messages: list[dict[str, Any]] = []
 
         # Action log file
-        self.log_path = output_dir / self.state.agent_id / "actions.jsonl"
-        self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        agent_dir = output_dir / self.state.agent_id
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        persona_slug = safe_slug(self.persona.name)
+        self.log_path = agent_dir / f"{persona_slug}.jsonl"
 
     def _log_action(self, action_data: dict[str, Any]) -> None:
         """Append action to JSONL log."""

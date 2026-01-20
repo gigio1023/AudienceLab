@@ -103,8 +103,13 @@ export default function App() {
     ? `${formatNumber(budgetUsed)} / ${formatNumber(budgetTotal)}${budgetUnit ? ` ${budgetUnit}` : ""}`
     : `${formatNumber(budgetUsed)}${budgetUnit ? ` ${budgetUnit}` : ""}`;
   const budgetPercentLabel = budgetTotal ? `${(budgetRatio * 100).toFixed(1)}%` : "n/a";
-  const metrics = simulation?.result?.metrics;
-  const confidenceLevel = simulation?.result?.confidenceLevel ?? "unknown";
+  const metrics = simulation?.result?.metrics ?? {
+    reach: activeAgentCount,
+    engagement: activityEvents.length,
+    conversionEstimate: 0,
+    roas: 0
+  };
+  const confidenceLevel = simulation?.result?.confidenceLevel ?? "live";
   const statCards = [
     {
       label: "Reach",
@@ -130,15 +135,43 @@ export default function App() {
   const latestActivity = activityEvents[0];
   const feedLabel = status === "error" ? "feed error" : status === "loading" ? "connecting" : "live";
   const activityLabel = activityStatus === "error" ? "feed error" : activityStatus === "loading" ? "connecting" : "live";
+  const personaSeeds = personasData as PersonaSeed[];
+  const personaByUsername = new Map(
+    personaSeeds.map(persona => [persona.username.toLowerCase(), persona])
+  );
+  const agentPersonaById = new Map<string, string>();
+  const extractPersonaFromSource = (source: string) => {
+    const markerIndex = source.indexOf("__");
+    if (markerIndex === -1) return null;
+    return source.slice(markerIndex + 2).replace(/\.jsonl$/i, "") || null;
+  };
+  activityEvents.forEach(event => {
+    const username = extractPersonaFromSource(event.source);
+    if (username) {
+      agentPersonaById.set(event.agent_id, username);
+    }
+  });
+  const agentPersonaPairs = agentSummaries
+    .map(agent => {
+      const username = agentPersonaById.get(agent.id);
+      if (!username) return null;
+      const persona = personaByUsername.get(username.toLowerCase());
+      return persona ? { agentId: agent.id, persona } : null;
+    })
+    .filter((entry): entry is { agentId: string; persona: PersonaSeed } => Boolean(entry));
+  const uniquePersonas = Array.from(
+    new Map(agentPersonaPairs.map(entry => [entry.persona.username, entry.persona])).values()
+  );
+  const latestPersona = latestActivity?.agent_id ? agentPersonaById.get(latestActivity.agent_id) ?? null : null;
   const postContext = simulation?.config.parameters?.postContext ?? "";
   const handleMatch = postContext.match(/@([a-zA-Z0-9._-]+)/);
-  const influencerHandle = handleMatch ? `@${handleMatch[1]}` : "unknown";
+  const influencerHandle = handleMatch ? `@${handleMatch[1]}` : "local";
+  const primaryPersona = agentPersonaPairs[0]?.persona.username ?? "Swarm run";
   const influencer = {
-    name: simulation?.config.targetPersona ?? "Simulation pending",
+    name: simulation?.config.targetPersona ?? primaryPersona,
     handle: influencerHandle,
-    focus: simulation?.config.goal ?? "Waiting for simulation data"
+    focus: simulation?.config.goal ?? "Local multi-agent activity"
   };
-  const personas = (personasData as PersonaSeed[]).slice(-3);
 
   return (
     <div className="app-shell">
@@ -173,14 +206,14 @@ export default function App() {
           <div className="stats-grid">
             <div className="stat-card">
               <span className="stat-label">Status</span>
-              <span className="stat-value">{simulation?.status ?? "loading"}</span>
-              <span className="stat-note">Simulation ID: {simulation?.simulationId ?? simulationId}</span>
+              <span className="stat-value">{simulation?.status ?? (activityEvents.length ? "running" : "waiting")}</span>
+              <span className="stat-note">Simulation ID: {simulation?.simulationId ?? "activity-only"}</span>
             </div>
             <div className="stat-card">
               <span className="stat-label">Agents</span>
-              <span className="stat-value">{activeAgentCount || simulation?.config.parameters?.agentCount || "—"}</span>
+              <span className="stat-value">{activeAgentCount || simulation?.config.parameters?.agentCount || agentFiles.length}</span>
               <span className="stat-note">
-                Target: {simulation?.config.parameters?.agentCount ?? "waiting"}
+                Target: {simulation?.config.parameters?.agentCount ?? agentFiles.length}
               </span>
             </div>
             {statCards.map(card => (
@@ -207,7 +240,9 @@ export default function App() {
             <div className="activity-line">
               <span className="meta-label">Latest activity</span>
               <span className="meta-value">
-                {latestActivity ? `${latestActivity.agent_id} · ${latestActivity.action}` : "Waiting for agent logs"}
+                {latestActivity
+                  ? `${latestActivity.agent_id}${latestPersona ? ` · ${latestPersona}` : ""} · ${latestActivity.action}`
+                  : "Waiting for agent logs"}
               </span>
             </div>
             {latestActivity?.content && <p className="activity-note">{latestActivity.content}</p>}
@@ -276,7 +311,10 @@ export default function App() {
                 agentSummaries.map(agent => (
                   <div key={agent.id} className="agent-card">
                     <div className="agent-header">
-                      <strong>{agent.id}</strong>
+                      <strong>
+                        {agent.id}
+                        {agentPersonaById.has(agent.id) ? ` · ${agentPersonaById.get(agent.id)}` : ""}
+                      </strong>
                       <span className="agent-total">{agent.total} actions</span>
                     </div>
                     <div className="agent-last">
@@ -309,29 +347,33 @@ export default function App() {
         <section className="persona-section">
           <div className="section-header">
             <h2>User personas</h2>
-            <p>Definitions used by the simulation agents.</p>
+            <p>Definitions referenced by live agents (matched by username).</p>
           </div>
           <div className="persona-grid">
-            {personas.map(persona => (
-              <div key={persona.username} className="persona-card">
-                <div className="persona-header">
-                  <div>
-                    <strong>{persona.username}</strong>
-                    <span className="persona-id">{persona.occupation}</span>
+            {uniquePersonas.length ? (
+              uniquePersonas.map(persona => (
+                <div key={persona.username} className="persona-card">
+                  <div className="persona-header">
+                    <div>
+                      <strong>{persona.username}</strong>
+                      <span className="persona-id">{persona.occupation}</span>
+                    </div>
+                    <span className="persona-tone">{persona.communication_style}</span>
                   </div>
-                  <span className="persona-tone">{persona.communication_style}</span>
+                  <p className="persona-description">
+                    {persona.age_range} · {persona.location} · {persona.engagement_level} engagement
+                  </p>
+                  <p className="persona-description">
+                    Traits: {persona.personality_traits.slice(0, 3).join(", ")}
+                  </p>
+                  <p className="persona-description">
+                    Interests: {persona.interests.slice(0, 3).join(", ")}
+                  </p>
                 </div>
-                <p className="persona-description">
-                  {persona.age_range} · {persona.location} · {persona.engagement_level} engagement
-                </p>
-                <p className="persona-description">
-                  Traits: {persona.personality_traits.slice(0, 3).join(", ")}
-                </p>
-                <p className="persona-description">
-                  Interests: {persona.interests.slice(0, 3).join(", ")}
-                </p>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div className="empty-card">No persona usernames matched in agent IDs yet.</div>
+            )}
           </div>
         </section>
       </main>

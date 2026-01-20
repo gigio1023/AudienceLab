@@ -57,11 +57,11 @@ eval-agent -> shared/evaluation/results/{evaluationId}.json
 ## 설치 및 실행
 
 ```bash
-# 1) Configure agent env
+# 1) Configure agent env (only required .env in the repo)
 cp agent/.env.sample agent/.env
 # Set:
 # OPENAI_API_KEY=...
-# SNS_URL=http://localhost:8383
+# SNS_URL=http://localhost:51737
 # (Optional for sns-vibe login) SNS_USERNAME=agent1
 
 # 2) Start SNS (Terminal 1)

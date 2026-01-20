@@ -11,6 +11,8 @@ import json
 import os
 import random
 import re
+import signal
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -392,6 +394,61 @@ def pick_session_intent(persona: Persona) -> str:
     return random.choice(SESSION_INTENTS)
 
 
+def safe_slug(value: str) -> str:
+    """Normalize a value for filenames."""
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", (value or "").strip().lower()).strip("-")
+    return cleaned or "unknown"
+
+
+def _find_free_port() -> int:
+    """Pick a random high port that is likely free."""
+    import socket
+
+    for _ in range(20):
+        port = random.randint(10000, 65000)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            if sock.connect_ex(("127.0.0.1", port)) != 0:
+                return port
+    return random.randint(10000, 65000)
+
+
+def start_playwright_mcp() -> subprocess.Popen[str] | None:
+    """Start Playwright MCP server on a random port and set PLAYWRIGHT_MCP_URL."""
+    port = _find_free_port()
+    env = os.environ.copy()
+    env["PLAYWRIGHT_MCP_URL"] = f"http://localhost:{port}/mcp"
+
+    cmd = ["npx", "@playwright/mcp", "--port", str(port)]
+    try:
+        proc: subprocess.Popen[str] = subprocess.Popen(
+            cmd,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as exc:
+        logger.warning("Failed to start Playwright MCP server: {}", exc)
+        return None
+
+    os.environ["PLAYWRIGHT_MCP_URL"] = env["PLAYWRIGHT_MCP_URL"]
+    logger.info("Playwright MCP server started at {}", env["PLAYWRIGHT_MCP_URL"])
+    return proc
+
+
+def _terminate_process(proc: subprocess.Popen[str]) -> None:
+    """Terminate child process safely."""
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 async def extract_page_content(page: Page) -> str:
     """Extract readable content from the page for decision making."""
     try:
@@ -476,7 +533,9 @@ class LocalPlaywrightAgent:
         # Output directory - flat structure for dashboard
         self.output_dir = config.output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.log_path = self.output_dir / f"{self.state.agent_id}.jsonl"
+        persona_slug = safe_slug(self.persona.username)
+        agent_slug = safe_slug(self.state.agent_id)
+        self.log_path = self.output_dir / f"{agent_slug}__{persona_slug}.jsonl"
 
     def _log_action(self, action_data: dict[str, Any]) -> None:
         """Append action to JSONL log."""
@@ -981,6 +1040,15 @@ if __name__ == "__main__":
     import argparse
     from runner import configure_logger
 
+    mcp_proc: subprocess.Popen[str] | None = None
+
+    def _shutdown(*_: object) -> None:
+        if mcp_proc:
+            _terminate_process(mcp_proc)
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _shutdown)
+
     # Setup argument parser with good defaults
     parser = argparse.ArgumentParser(
         description="Run multi-agent SNS simulation",
@@ -1026,6 +1094,9 @@ if __name__ == "__main__":
     # Configure logging
     configure_logger("INFO")
 
+    # Auto-start Playwright MCP server for local_agent runs
+    mcp_proc = start_playwright_mcp()
+
     # Load personas from sns-vibe/seeds/personas.json
     personas = load_personas_from_seeds()
     if not personas:
@@ -1053,3 +1124,6 @@ if __name__ == "__main__":
     print(json.dumps(results, indent=2))
     print("\n=== Metrics ===")
     print(json.dumps(metrics, indent=2))
+
+    if mcp_proc:
+        _terminate_process(mcp_proc)
