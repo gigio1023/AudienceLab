@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SimulationOutput",
+  "type": "object",
+  "required": ["simulationId", "status", "progress", "createdAt", "updatedAt", "config"],
+  "properties": {
+    "simulationId": {"type": "string"},
+    "status": {"type": "string", "enum": ["pending", "running", "completed", "failed"]},
+    "progress": {"type": "integer", "minimum": 0, "maximum": 100},
+    "createdAt": {"type": "string"},
+    "updatedAt": {"type": "string"},
+    "config": {
+      "type": "object",
+      "required": ["goal", "budget", "duration", "targetPersona"],
+      "properties": {
+        "goal": {"type": "string", "minLength": 10},
+        "budget": {"type": "number"},
+        "duration": {"type": "number"},
+        "targetPersona": {"type": "string"},
+        "parameters": {"type": "object"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["metrics", "confidenceLevel", "agentLogs", "personaTraces"],
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "required": ["reach", "engagement", "conversionEstimate", "roas"],
+          "properties": {
+            "reach": {"type": "number"},
+            "engagement": {"type": "number"},
+            "conversionEstimate": {"type": "number"},
+            "roas": {"type": "number"}
+          }
+        },
+        "confidenceLevel": {"type": "string", "enum": ["low", "medium", "high"]},
+        "agentLogs": {"type": "array"},
+        "personaTraces": {"type": "array"}
+      }
+    }
+  }
+}

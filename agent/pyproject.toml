@@ -1,0 +1,13 @@
+[project]
+name = "audiencelab-agent"
+version = "0.1.0"
+description = "Persona-driven browser agent for local SNS simulation"
+requires-python = ">=3.12"
+dependencies = [
+  "openai>=1.40.0",
+  "playwright>=1.46.0",
+  "python-dotenv>=1.0.1",
+]
+
+[project.scripts]
+run-single-agent = "single_agent:main"
