@@ -15,6 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!sns-vibe/src/lib/
 lib64/
 parts/
 sdist/
