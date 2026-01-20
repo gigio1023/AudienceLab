@@ -4,10 +4,15 @@ AudienceLab
 
 ## 데모
 
+### Dashboard
 ![](images/dash01.png)
 ![](images/dash02.png)
+
+### Persona-based User Agent Swarm for SNS Simulation
 ![](images/agent.png)
 ![](images/sns.png)
+
+### Evaluation
 ![](images/eval.png)
 
 ## 문제 정의
