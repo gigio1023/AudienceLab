@@ -153,7 +153,7 @@ def load_personas_from_seeds() -> list[Persona]:
         data = json.load(f)
 
     personas = []
-    for item in data:
+    for item in reversed(data):
         try:
             personas.append(Persona.from_dict(item))
         except Exception as e:

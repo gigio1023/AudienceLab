@@ -138,7 +138,7 @@ export default function App() {
     handle: influencerHandle,
     focus: simulation?.config.goal ?? "Waiting for simulation data"
   };
-  const personas = (personasData as PersonaSeed[]).slice(0, 3);
+  const personas = (personasData as PersonaSeed[]).slice(-3);
 
   return (
     <div className="app-shell">
