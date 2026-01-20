@@ -28,22 +28,17 @@ git submodule update --init --recursive
 Docker Compose를 사용하여 격리된 Pixelfed 인스턴스를 기동한다.
 
 ```bash
-cd sns/pixelfed
-# Configuration Injection (Production-like local config)
-cp ../.env.fixture .env
-
-# Container Orchestration
-docker-compose up -d --force-recreate
+./scripts/setup_sns.sh
 ```
 
-> **Wait Check**: 컨테이너 3개(`pixelfed-app`, `pixelfed-db`, `pixelfed-redis`)가 모두 `Running` 상태가 될 때까지 약 30초 대기한다. (`docker ps`로 확인)
+> **Wait Check**: 컨테이너(`pixelfed-app`, `pixelfed-db`, `pixelfed-redis`, `pixelfed-caddy`, `pixelfed-horizon`, `pixelfed-scheduler`)가 모두 `Running` 상태가 될 때까지 약 30초 대기한다. (`docker-compose ps`로 확인)
 
 ### Step 1.3: Data Seeding (World State Setting)
 빈 데이터베이스에 인플루언서, 에이전트, 관리자 계정을 주입한다.
 
 ```bash
-# Seed Execution Pipe
-cat seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
+# Seed Execution Pipe (필요 시 재시딩)
+cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
 ```
 
 ---
@@ -89,7 +84,7 @@ npm run dev
 
 1.  **SNS Connectivity**:
     *   `curl -k https://localhost:8092` -> `200 OK` (또는 리다이렉트) 응답 확인.
-    *   브라우저 로그인: `agent1` / `password` 성공 확인.
+    *   브라우저 로그인: `agent1@local.dev` / `password` (이메일 로그인) 성공 확인.
 2.  **Agent Logic**:
     *   `cd agent && uv run test_single_agent.py` 실행 시 스크린샷 캡처 성공 확인.
 3.  **Dashboard Integration**:

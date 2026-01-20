@@ -14,7 +14,11 @@
     ```
 *   **Resolution**:
     1.  컨테이너 상태 확인 (Exited 상태인지 확인).
-    2.  환경변수 변경사항 반영을 위한 강제 재생성:
+    2.  `pixelfed-db` 또는 `pixelfed-redis`가 `Created` 상태면 다음을 실행:
+        ```bash
+        docker-compose up -d db redis
+        ```
+    3.  환경변수 변경사항 반영을 위한 강제 재생성:
         ```bash
         docker-compose up -d --force-recreate
         ```
@@ -38,9 +42,9 @@
 *   **Resolution**:
     *   **Immediate Fix (DB Reset)**:
         ```bash
-        cat seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
+        cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
         ```
-    *   Login 성공 여부를 수동 브라우저로 교차 검증 (`agent1` / `password`).
+    *   Login 성공 여부를 수동 브라우저로 교차 검증 (`agent1@local.dev` / `password`, 이메일 로그인).
 
 ### Case 2.2: LLM Hallucination / Rate Limits
 *   **Symptom**: 에이전트가 엉뚱한 곳을 클릭하거나, API 오류 로그(`429 Too Many Requests`) 발생.
