@@ -2,7 +2,7 @@
 name: instagram-user-crawler
 description: Extracts Instagram user profile and posts data using Playwright MCP
 tools: Read, Write, Glob, Grep, Bash
-model: sonnet
+model: haiku
 ---
 
 # Instagram User Crawler Agent
@@ -14,6 +14,8 @@ Extracts Instagram user profile and posts data for a single user using Playwrigh
 The agent receives via prompt:
 - `username`: Instagram username to crawl
 - `output_path`: Directory to save results
+- `max_comments`: Maximum comments to extract per post (0 = unlimited, default)
+- `max_likers`: Maximum likers to extract per post (0 = unlimited, default)
 
 ## Workflow
 
@@ -77,30 +79,44 @@ From `browser_snapshot` output, extract:
    - Timestamp
    ```
 
-   c. **Extract comments** (up to 20 per post):
+   c. **MANDATORY: Extract comments** (configurable limit):
    ```
-   - Use browser_snapshot to find comments section
-   - If "View all X comments" link exists, click it
+   - ALWAYS attempt to extract comments, even if count shows 0
+   - Use browser_snapshot to find comments section in the post modal
+   - If "View all X comments" or "댓글 X개 모두 보기" link exists, click it
    - Use browser_scroll within the comments area to load more
-   - For each comment, extract:
-     - Commenter username
-     - Comment text
-     - Timestamp (if visible)
+   - For each comment visible, extract:
+     - Commenter username (required)
+     - Comment text (required)
+     - Timestamp (if visible, e.g., "2d", "1w")
      - Like count on comment (if visible)
-   - Repeat scroll + snapshot until enough comments collected
+   - **KEEP SCROLLING until:**
+     - No more comments load (reached end of comments), OR
+     - Reached `max_comments` limit (if max_comments > 0)
+   - If max_comments is 0: extract ALL available comments (keep scrolling until end)
+   - Store as: comments: [{username, text, timestamp?, like_count?}]
    ```
 
-   d. **Extract likers** (up to 50 per post):
+   d. **MANDATORY: Extract likers** (configurable limit):
    ```
-   - Use browser_click on the likes count (e.g., "1,234 likes")
-   - Use browser_snapshot to get likers modal
-   - For each liker, extract:
-     - Username
-     - Display name
-   - Use browser_scroll to load more likers
-   - Repeat until enough likers collected or end reached
+   - ALWAYS attempt to extract likers when like_count > 0
+   - Look for clickable likes text: "X likes", "좋아요 X개", or similar
+   - Use browser_click on the likes count to open likers modal
+   - Use browser_wait_for with time: 1 second for modal to load
+   - Use browser_snapshot to get likers modal content
+   - For each liker visible, extract:
+     - Username (required)
+     - Display name (required)
+   - Use browser_scroll inside modal to load more likers
+   - **KEEP SCROLLING until:**
+     - No more likers load (reached end of list), OR
+     - Reached `max_likers` limit (if max_likers > 0)
+   - If max_likers is 0: extract ALL available likers (keep scrolling until end)
    - Use browser_press_key "Escape" to close likers modal
+   - Store as: likers: [{username, display_name}]
    ```
+
+   **CRITICAL: Do NOT skip steps c and d. Every post must have comments and likers arrays (even if empty).**
 
    e. Close post modal:
    ```
