@@ -24,20 +24,20 @@ The agent system uses a **local-first architecture** where:
 3. **No MCP server required** - Unlike traditional MCP implementations that need public URLs
 
 ```
-┌─────────────────┐
-│  Agent Runner   │
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    │         │
-┌───▼──┐  ┌──▼───┐
-│ Hero │  │Crowd │  (Multiple agents run concurrently)
-└───┬──┘  └──┬───┘
-    │         │
-┌───▼─────────▼────┐
-│ LocalPlaywright  │  (Local browser automation)
-│     Agent        │
-└────────┬─────────┘
+┌──────────────────────┐
+│ Swarm Agent Runner   │
+└──────────┬───────────┘
+           │
+    ┌──────┴──────┐
+    │             │
+┌───▼──────┐  ┌───▼──────┐
+│ Headed  │  │ Headless │  (Same behavior, different UI visibility)
+│ Agents  │  │ Agents   │
+└───┬──────┘  └───┬──────┘
+    │             │
+┌───▼─────────────▼────┐
+│ LocalPlaywright Agent │  (Local browser automation)
+└────────┬─────────────┘
          │
     ┌────┴────┐
     │         │
@@ -61,7 +61,7 @@ The agent system uses a **local-first architecture** where:
 - Logs all actions to JSONL files
 
 **Runner** (`runner.py`)
-- Orchestrates multiple agents (hero + crowd)
+- Orchestrates a swarm of agents (headed or headless)
 - Manages concurrency with semaphores
 - Aggregates results and metrics
 
@@ -196,7 +196,7 @@ This is handled automatically in `local_agent.py:_get_decision()`.
 ### Using run_all.sh (Recommended)
 
 ```bash
-# Basic usage - 9 crowd agents, max 4 concurrent
+# Basic usage - 9 swarm agents, max 4 concurrent
 ./run_all.sh
 
 # Custom configuration
@@ -213,7 +213,7 @@ This is handled automatically in `local_agent.py:_get_decision()`.
 ```
 
 **Options:**
-- `--crowd-count N` - Number of crowd agents (default: 9)
+- `--crowd-count N` - Number of swarm agents (default: 9)
 - `--max-concurrency N` - Max concurrent agents (default: 4)
 - `--headed` - Show browser windows
 - `--dry-run` - Skip actual browser actions
@@ -238,10 +238,10 @@ python cli.py run --goal "Engagement simulation" --crowd-count 9
 
 **CLI Options:**
 - `--goal TEXT` - Simulation goal description
-- `--crowd-count N` - Number of crowd agents (default: 8)
+- `--crowd-count N` - Number of swarm agents (default: 8)
 - `--max-concurrency N` - Max concurrent agents (default: 4)
 - `--dry-run` - Skip OpenAI calls and actual actions
-- `--no-hero` - Disable hero agent
+- `--no-hero` - Disable the optional headed agent (legacy flag name)
 - `--headed` - Show browser windows
 - `--no-screenshots` - Disable screenshots
 - `--persona-file PATH` - Custom personas JSON file
@@ -270,12 +270,12 @@ All simulation outputs are stored in `agent/outputs/{runId}/`:
 ```
 outputs/
 └── {runId}/
-    ├── hero/
+    ├── hero/  (legacy label; all agents share the same behavior)
     │   ├── actions.jsonl
     │   ├── 001_navigate.json
     │   ├── 002_login.json
     │   └── ...
-    ├── local-crowd-001/
+    ├── local-crowd-001/  (legacy label; all agents share the same behavior)
     │   ├── actions.jsonl
     │   └── ...
     ├── local-crowd-002/
@@ -465,7 +465,7 @@ See `runner.py:run_mcp_agents()` for the main orchestration logic. Key extension
 # Test with single agent
 uv run python single_agent.py --mcp --headed
 
-# Test with small crowd
+# Test with small swarm
 ./run_all.sh --crowd-count 2 --max-concurrency 1 --headed
 
 # Dry-run mode (no actual actions)

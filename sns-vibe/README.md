@@ -60,12 +60,17 @@ sns-vibe/
    npm install
    ```
 
-2. Seed the database (optional, happens on app start if check added, currently manual script):
+2. Reset the database (required for a clean dev run):
+   ```bash
+   bash scripts/reset-db.sh
+   ```
+
+3. Seed the database (optional, happens on app start if check added, currently manual script):
    ```bash
    npx tsx src/lib/server/seed.ts
    ```
 
-3. Start dev server:
+4. Start dev server:
    ```bash
    npm run dev
    ```

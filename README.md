@@ -1,48 +1,29 @@
 # AudienceLab
 
-> A local-first, persona-driven multi-agent SNS simulator that generates engagement signals and streams results to a live dashboard.
+> A local-first, persona-driven swarm simulator for influencer campaign planning. It mirrors real engagement patterns on a local SNS, logs outcomes to shared contracts, and renders results in a live dashboard.
 
-## Demo
+## Why it exists
 
-Local demo:
-- SNS: http://localhost:51737
-- Dashboard: http://localhost:51730
+Influencer campaigns are expensive to validate. Teams need a fast, repeatable way to compare shortlisted creators using realistic engagement signals **before** spending budget. AudienceLab provides a closed-loop simulation that turns real Instagram-derived context into structured, comparable metrics.
 
-Ports are configured in each `package.json`, so you do not need to pass explicit port flags when starting the dev servers.
+## What it does
 
-## Problem Definition
+- Builds persona-driven agents from real or templated audience signals
+- Simulates likes, comments, and follows on a local SNS
+- Produces normalized engagement metrics and per-agent action logs
+- Streams outputs to a dashboard for review and comparison
 
-Influencer campaigns are expensive to validate, and teams lack a fast, repeatable way to compare shortlisted creators with realistic engagement signals before spending real budget.
+## Closed-Loop Flow (Data → Persona → Simulation → Metrics)
 
-## Solution
+1. **Instagram data (Tier 1+)** informs influencer and audience context
+2. **Persona builder** produces audience personas (Tier 2+ if comments exist)
+3. **Swarm simulation** runs persona agents on a local SNS
+4. **Metrics** are aggregated and normalized
+5. **Dashboard** ranks candidates and explains why
 
-AudienceLab runs a local SNS and drives a swarm of persona-based agents using Playwright + OpenAI to simulate likes, comments, and follows. The swarm is behaviorally identical; the only difference is whether a given agent runs headed or headless. Results are logged to shared JSON contracts and can be monitored live via the dashboard.
+## Swarm Model
 
-## Evaluation
-
-Evaluation is implemented in `eval-agent/` and operates on agent action logs from `search-dashboard/public/simulation/*.jsonl`:
-
-- Quantitative metrics
-  - Engagement Rate = successful (like/comment/follow) / total steps
-  - Marketing Engagement Rate = successful (like/comment) on marketing-tagged seed posts / total steps
-  - Action distribution by type and success
-- Qualitative metrics (LLM judge)
-  - Uses `gpt-5-mini` to score comments on:
-    - Relevance (1-5)
-    - Tone (1-5)
-    - Consistency (1-5)
-  - Produces average quality scores and a human-readable verdict
-- Verdict thresholds
-  - Engagement Level: High (>= 50%), Medium (20-49%), Low (< 20%)
-  - Comment Quality: Excellent (>= 4.5), Good (4.0-4.4), Fair (3.0-3.9), Poor (< 3.0)
-
-Output is summarized in `eval-agent/evaluation_report.md`.
-
-## Requirements Checklist
-
-- [x] OpenAI API usage
-- [x] Multi-agent implementation
-- [x] Runnable demo
+All agents share the same behavior model. The only difference between agents is whether they run **headed** (visible browser) or **headless** (no UI). This keeps the swarm consistent while allowing visual debugging when needed.
 
 ## Architecture
 
@@ -72,14 +53,24 @@ Evaluation (eval-agent)
   - LLM judge (gpt-5-mini) for comment quality
 ```
 
-## Tech Stack
+## Repo Structure
 
-- Python, Playwright, OpenAI API (agent runner)
-- SvelteKit, SQLite, Tailwind (sns-vibe)
-- React, Vite (search-dashboard)
-- Python, Pandas, OpenAI API (eval-agent)
+- `agent/` — persona-based browser agents (Playwright + OpenAI)
+- `sns-vibe/` — local SNS sandbox (SvelteKit + SQLite)
+- `search-dashboard/` — simulation + reporting UI (React + Vite)
+- `shared/` — simulation contract and outputs
+- `eval-agent/` — offline evaluation on JSONL logs
+- `docs/` — deep dives, strategy, troubleshooting
 
-## Install & Run
+## Demo Ports
+
+Local demo (default dev ports):
+- SNS: http://localhost:51737
+- Dashboard: http://localhost:51730
+
+Ports are configured in each `package.json`, so you do not need to pass explicit port flags when starting the dev servers.
+
+## Quick Start
 
 ```bash
 # 1) Configure agent env
@@ -92,6 +83,7 @@ cp agent/.env.sample agent/.env
 # 2) Start SNS (Terminal 1)
 cd sns-vibe
 npm install
+bash scripts/reset-db.sh
 npm run dev
 
 # 3) Start Dashboard (Terminal 2)
@@ -113,46 +105,53 @@ uv sync
 uv run python evaluate.py
 ```
 
-## Cost Estimate (GPT-5 mini)
+## Output Contracts
 
-Agent actions consume tokens when decisions are made. In the local Playwright loop (`agent/local_agent.py`), each step calls the model with:
+- **Simulation state**: `shared/simulation/{simulationId}.json`
+- **Per-agent action logs**: `agent/outputs/{runId}/{agentId}/actions.jsonl`
+- **Dashboard feed**: `search-dashboard/public/simulation/*.jsonl`
 
+See `shared/simulation-schema.json` for the contract.
+
+## Evaluation Summary
+
+Evaluation is implemented in `eval-agent/` and operates on action logs from `search-dashboard/public/simulation/*.jsonl`:
+
+- **Quantitative metrics**
+  - Engagement Rate = successful (like/comment/follow) / total steps
+  - Marketing Engagement Rate = successful (like/comment) on marketing-tagged seed posts / total steps
+  - Action distribution by type and success
+- **Qualitative metrics (LLM judge)**
+  - Uses `gpt-5-mini` to score comments on relevance, tone, and consistency
+  - Produces average quality scores and a human-readable verdict
+
+Output is summarized in `eval-agent/evaluation_report.md`.
+
+## Cost Notes (GPT-5 mini)
+
+Each step calls the model with:
 - A system prompt (persona + rules)
-- A user prompt containing current page content (up to ~4000 chars)
+- A user prompt containing current page content
 
 Rule-of-thumb estimate per step:
 - Input: ~1.2k-1.8k tokens
 - Output: ~60-120 tokens
 
-Pricing (given):
-- Input: $0.250 / 1M tokens
-- Output: $2.000 / 1M tokens
-
-Per-step cost (approx):
-```
-Input 1.5k  -> $0.000375
-Output 100  -> $0.000200
-Total       -> $0.000575 per step
-```
-
 Example (default 9 agents x 35 steps = 315 steps):
-```
-~$0.13 - $0.22 total (typical range)
-```
+- ~`$0.13 - $0.22` total (typical range)
 
-Notes:
-- The `budget` value in `agent/cli.py` is recorded in the simulation config but does not currently enforce stopping.
-- Non-`--mcp` runs in `agent/cli.py` make fewer model calls (one decision per agent), so cost is lower.
+## Troubleshooting Quick Hits
 
-## Roadmap (Optional)
+- **SNS not reachable**: confirm `SNS_URL`, then restart `sns-vibe`.
+- **Playwright missing**: `uv run playwright install chromium`.
+- **Slow runs**: reduce `--crowd-count` or `--max-concurrency`.
 
-- Directly stream `shared/simulation/{id}.json` into the dashboard without manual copy
-- Expand evaluation to compare multiple runs and export a summary report
+## Roadmap (Short)
 
-## Team
+- Stream `shared/simulation/{id}.json` directly into the dashboard
+- Multi-run comparison and exportable reports
+- WebSocket progress updates
 
-| Name | Role |
-| ---- | ---- |
-|      |      |
-|      |      |
-|      |      |
+## License
+
+Hackathon project. Local-first demo focus.
