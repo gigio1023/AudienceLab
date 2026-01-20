@@ -8,6 +8,7 @@ AudienceLab
 ![](images/dash02.png)
 ![](images/agent.png)
 ![](images/sns.png)
+![](images/eval.png)
 
 ## 문제 정의
 
