@@ -29,6 +29,12 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--post-context", default=default_post_context())
     run_parser.add_argument("--crowd-count", type=int, default=8)
     run_parser.add_argument("--no-hero", action="store_true")
+    run_parser.add_argument(
+        "--hero-mode",
+        choices=["auto", "cua", "text"],
+        default="auto",
+        help="Hero decision mode: auto/text use gpt-5-mini; cua is deprecated and treated as text",
+    )
     run_parser.add_argument("--hero-persona", default=None)
     run_parser.add_argument("--persona-file", default=None)
     run_parser.add_argument("--target-persona", default=None)
@@ -94,6 +100,7 @@ def main() -> None:
         message_tone=args.message_tone,
         crowd_count=args.crowd_count,
         hero_enabled=hero_enabled,
+        hero_mode=args.hero_mode,
         hero_persona_id=args.hero_persona,
         post_context=args.post_context,
         dry_run=args.dry_run,

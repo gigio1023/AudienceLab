@@ -42,8 +42,8 @@
 
 | 단계 | 시간 | Engine Team (Backend/AI) | Agent Team (Frontend/Visual) |
 |---|---|---|---|
-| **P1: Ground Truth** | 11:30 - 12:00 | **수동 데이터 수집**: 인플루언서 3명, 포스트 15개, 댓글 50개를 직접 수집해 시드 스크립트에 반영. (가장 중요) | **환경 셋업**: Pixelfed Docker 구동, 로컬 접속 확인. |
-| **P2: Foundation** | 12:00 - 13:30 | **데이터 주입**: `sns/seed_hackathon.php`로 Pixelfed DB 시딩. | **Visual 기초**: Playwright 루프 구현 (로그인 -> 스크롤 -> 스크린샷). |
+| **P1: Ground Truth** | 11:30 - 12:00 | **수동 데이터 수집**: 인플루언서 3명, 포스트 15개, 댓글 50명을 직접 수집해 seeds.json에 반영. (가장 중요) | **환경 셋업**: SNS-Vibe Docker 구동, 로컬 접속 확인. |
+| **P2: Foundation** | 12:00 - 13:30 | **데이터 주입**: `src/lib/server/seed.ts`로 SNS-Vibe DB 시딩. | **Visual 기초**: Playwright 루프 구현 (로그인 -> 스크롤 -> 스크린샷). |
 | **P3: The Swarm** | 13:30 - 15:30 | **Ghost Swarm**: `ThreadPool`로 VLM 병렬 호출 -> API 폭격. **댓글 내용의 퀄리티(페르소나 반영)**에 집중. | **Visual 튜닝**: "읽고 -> 멈칫하고 -> 클릭하는" 사람 같은 타이밍(Human-like Timing) 튜닝. |
 | **P4: Integration** | 15:30 - 16:30 | **대시보드 연동**: 실시간 API 로그를 대시보드에 스트리밍 ("Agent #42님이 댓글을 남겼습니다"). | **상호작용 확인**: 'Hero'가 'Crowd'가 남긴 댓글을 보고 반응하는 시나리오 테스트. |
 | **P5: Showtime** | 16:30 - 18:30 | **시나리오 리허설**: 데모 영상 녹화 및 편집. | **마무리**: UI 폴리싱, README 및 발표 자료 작성. |

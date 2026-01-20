@@ -1,14 +1,13 @@
 # Instagram Crawler (Current Status)
 
-본 저장소에는 **Instagram 크롤러가 포함되어 있지 않다**. 현재 구현은 로컬 SNS(Pixelfed) 시드 데이터를 수동/스크립트로 주입하는 방식에 집중한다.
+본 저장소에는 **Instagram 크롤러가 포함되어 있지 않다**. 현재 구현은 로컬 SNS(SNS-Vibe) 시드 데이터를 JSON으로 주입하는 방식에 집중한다.
 
 ## 1. Current Data Ingestion
 
-- 시드 스크립트: `sns/seed_hackathon.php`
+- 시드 데이터: `sns-vibe/seeds.json`
 - 실행 방법:
   ```bash
-  cd sns/pixelfed
-  cat ../seed_hackathon.php | docker-compose exec -T pixelfed php artisan tinker
+  npx tsx src/lib/server/seed.ts
   ```
 
 ## 2. Data Contract (Reference)

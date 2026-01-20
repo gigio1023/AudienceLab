@@ -1,0 +1,111 @@
+{
+    "users": [
+        {
+            "username": "admin",
+            "display_name": "Admin"
+        },
+        {
+            "username": "influencer1",
+            "display_name": "Influencer One"
+        },
+        {
+            "username": "agent1",
+            "display_name": "Agent 1"
+        },
+        {
+            "username": "agent2",
+            "display_name": "Agent 2"
+        },
+        {
+            "username": "agent3",
+            "display_name": "Agent 3"
+        },
+        {
+            "username": "agent4",
+            "display_name": "Agent 4"
+        },
+        {
+            "username": "agent5",
+            "display_name": "Agent 5"
+        },
+        {
+            "username": "agent6",
+            "display_name": "Agent 6"
+        },
+        {
+            "username": "agent7",
+            "display_name": "Agent 7"
+        },
+        {
+            "username": "agent8",
+            "display_name": "Agent 8"
+        },
+        {
+            "username": "agent9",
+            "display_name": "Agent 9"
+        },
+        {
+            "username": "agent10",
+            "display_name": "Agent 10"
+        }
+    ],
+    "posts": [
+        {
+            "username": "influencer1",
+            "content": "Launching my new campaign drop. Thoughts? #launch #ad",
+            "createdAt": "2026-01-20T09:00:00"
+        },
+        {
+            "username": "influencer1",
+            "content": "Morning routine essentials. #skincare #routine",
+            "createdAt": "2026-01-20T10:00:00"
+        },
+        {
+            "username": "influencer1",
+            "content": "Behind the scenes from today. #bts #creator",
+            "createdAt": "2026-01-20T12:00:00"
+        }
+    ],
+    "follows": [
+        {
+            "follower": "agent1",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent2",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent3",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent4",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent5",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent6",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent7",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent8",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent9",
+            "following": "influencer1"
+        },
+        {
+            "follower": "agent10",
+            "following": "influencer1"
+        }
+    ]
+}

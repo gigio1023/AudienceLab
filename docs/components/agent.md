@@ -65,9 +65,9 @@ OPENAI_COMPUTER_USE_MODEL=computer-use-preview
 # OPENAI_BASE_URL=https://api.openai.com/v1
 # OPENAI_AUTO_ACK_SAFETY_CHECKS=false
 AGENT_LOG_LEVEL=INFO
-SNS_URL=https://localhost:8092
-SNS_EMAIL=agent1@local.dev
-SNS_PASSWORD=password
+SNS_URL=http://localhost:8383
+SNS_EMAIL=agent1
+SNS_PASSWORD=ignored
 ```
 
 - `OPENAI_MODEL`: Crowd 판단 모델 (텍스트 기반)
@@ -75,7 +75,7 @@ SNS_PASSWORD=password
 - `OPENAI_REASONING_EFFORT`: Crowd 모델 추론 강도 (low 권장)
 - `OPENAI_AUTO_ACK_SAFETY_CHECKS`: CUA 안전 경고 자동 승인 여부 (기본 false)
 - `AGENT_LOG_LEVEL`: Loguru 로그 레벨 (DEBUG/INFO/WARNING/ERROR)
-- `SNS_EMAIL`: seed 계정 이메일 중 하나를 지정하면 해당 계정으로 로그인
+- `SNS_EMAIL`: SNS-Vibe Username (e.g. `agent1`)
 
 ---
 

@@ -14,6 +14,7 @@ def main() -> None:
         message_tone=persona.tone,
         crowd_count=0,
         hero_enabled=True,
+        hero_mode="auto",
         hero_persona_id=persona.id,
         post_context=default_post_context(),
         dry_run=False,

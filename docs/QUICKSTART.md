@@ -7,28 +7,29 @@
 | Software | Required Version | Verification Command |
 |----------|------------------|----------------------|
 | **Docker** | Desktop 4.0+ | `docker info` |
+| **Node.js** | 18+ (Dev) | `node --version` |
 | **Python** | 3.12+ | `python3 --version` |
 | **uv** | Latest | `uv --version` |
 
 ---
 
-## 1. Local SNS (Pixelfed) Setup
+## 1. Local SNS (SNS-Vibe) Setup
 
-### Option A: Script (Recommended)
-
-```bash
-./scripts/setup_sns.sh
-```
-
-### Option B: Manual
+New lightweight SvelteKit-based implementation.
 
 ```bash
-cd sns/pixelfed
-cp .env.docker.example .env
+cd sns-vibe
 
-docker-compose up -d --force-recreate
+# Install dependencies
+npm install
 
-cat ../seed_hackathon.php | docker-compose exec -T pixelfed php artisan tinker
+# Start (Docker) - Recommended for Agent Test
+docker-compose up -d --build
+# Access at http://localhost:8383
+
+# OR Start (Local Dev)
+npm run dev
+# Access at http://localhost:5173
 ```
 
 ---
@@ -38,10 +39,8 @@ cat ../seed_hackathon.php | docker-compose exec -T pixelfed php artisan tinker
 ```bash
 cd agent
 cp .env.sample .env
-# .env에 OPENAI_API_KEY 설정 (선택: OPENAI_BASE_URL)
-# SNS 설정이 다르면 SNS_URL/SNS_EMAIL/SNS_PASSWORD도 수정
-# 기본 모델: crowd=gpt-5-mini, hero=computer-use-preview
-# 로그 레벨 조정: AGENT_LOG_LEVEL=DEBUG (선택)
+# .env에 OPENAI_API_KEY 설정
+# SNS_URL을 http://localhost:8383 으로 설정 (Docker 기준)
 
 uv sync
 uv run playwright install chromium
