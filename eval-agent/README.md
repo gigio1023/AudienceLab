@@ -4,11 +4,11 @@
 
 ## 📌 개요
 
-Eval Agent는 시뮬레이션 과정에서 생성된 여러 에이전트의 활동 로그(`search-dashboard/public/simulation/*.jsonl`)를 수집 및 분석합니다. 단순한 수치 측정을 넘어, 해당 수치가 **좋은지 나쁜지(Verdict)**를 판단할 수 있는 등급 시스템을 포함하고 있습니다.
+Eval Agent는 **user persona 기반 swarm** 에이전트의 활동 로그(`search-dashboard/public/simulation/*.jsonl`)를 수집 및 분석합니다. 단순한 수치 측정을 넘어, 해당 수치가 **좋은지 나쁜지(Verdict)**를 판단할 수 있는 등급 시스템을 포함하고 있습니다.
 
 ## 📊 평가 지표 및 방법 (Evaluation Metrics & Methods)
 
-### 1. 종합 등급 (Performance Verdict)
+### 1. 종합 등급 (Performance Verdict) - 솔루션
 측정된 수치를 바탕으로 시스템이 자동으로 등급을 매겨 "좋음/나쁨"을 직관적으로 판단합니다.
 
 | 지표 (Metric) | 기준 (Criteria) | 등급 (Grade) | 의미 |
@@ -21,11 +21,11 @@ Eval Agent는 시뮬레이션 과정에서 생성된 여러 에이전트의 활�
 | | 3.0점 ~ 3.9점 | **Fair (보통)** | 무난하나 디테일 부족 가능성 있음 |
 | | 3.0점 미만 | **Poor (미흡)** | 엉뚱한 소리를 하거나 페르소나 붕괴 |
 
-### 2. 정량적 지표 (Quantitative Metrics)
+### 2. 정량적 지표 (Quantitative Metrics) - 솔루션
 - **Marketing Engagement Rate**: $$ \frac{\text{마케팅 포스트에 대한 성공 상호작용 수 (Like/Comment)}}{\text{전체 스텝 수}} $$
 - **Action Distribution**: 액션 유형별 성공/실패 분포.
 
-### 3. 정성적 분석 (Qualitative Analysis)
+### 3. 정성적 분석 (Qualitative Analysis) - 솔루션
 `gpt-5-mini`를 사용하여 **마케팅 포스트에 달린 댓글**의 품질을 3가지 축으로 평가합니다:
 1.  **Relevance (관련성)**: 문맥에 맞는가?
 2.  **Tone (어조)**: 페르소나에 어울리는가?
@@ -41,7 +41,7 @@ Eval Agent는 시뮬레이션 과정에서 생성된 여러 에이전트의 활�
 ```bash
 cd eval-agent
 cp .env.sample .env
-# OPENAI_API_KEY와 (선택) OPENAI_MAX_WORKERS를 설정한 뒤 실행
+# OPENAI_API_KEY를 설정한 뒤 실행
 uv sync
 uv run python evaluate.py
 ```
