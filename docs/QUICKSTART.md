@@ -27,8 +27,16 @@ cd sns/pixelfed
 cp .env.docker.example .env
 
 docker-compose up -d --force-recreate
+```
 
-cat ../seed_hackathon.php | docker-compose exec -T pixelfed php artisan tinker
+> **Wait Check**: 컨테이너(`pixelfed-app`, `pixelfed-db`, `pixelfed-redis`, `pixelfed-caddy`, `pixelfed-horizon`, `pixelfed-scheduler`)가 모두 `Running` 상태가 될 때까지 약 30초 대기한다. (`docker-compose ps`로 확인)
+
+### Step 1.3: Data Seeding (World State Setting)
+빈 데이터베이스에 인플루언서, 에이전트, 관리자 계정을 주입한다.
+
+```bash
+# Seed Execution Pipe (필요 시 재시딩)
+cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
 ```
 
 ---

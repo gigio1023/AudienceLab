@@ -110,9 +110,11 @@ Pixelfed(Laravel 기반 ActivityPub 사진 공유 플랫폼) 로컬 개발 환�
 
 - **`pixelfed/`**: 메인 프로젝트 디렉토리
   - **`.env`**: 환경변수의 단일 진실의 원천. 중요: 이를 수정하면 컨테이너를 다시 생성해야 합니다 (`docker-compose up -d --force-recreate`).
-  - **`docker-compose.yml`**: 인프라 정의. 현재 포트: **8092**
+  - **`docker-compose.yml`**: 인프라 정의. Caddy를 통해 **8092**로 HTTPS 제공
+  - **`docker-compose.override.yml`**: 로컬 포트/프록시 설정
+  - **`Caddyfile`**: Self-signed TLS + 리버스 프록시 설정
   - **`artisan`**: Laravel CLI 진입점 (호스트에서 직접 실행 금지; 컨테이너 내에서 실행)
-  - **`seed_hackathon.php`** (계획): 빠른 데이터 채우기 스크립트
+- **`seed_hackathon.php`**: 빠른 데이터 채우기 스크립트 (`sns/seed_hackathon.php`)
 
 #### 운영 가이드라인
 
@@ -129,9 +131,15 @@ docker exec pixelfed-app php artisan <command>
 1. DB 삭제: `docker exec pixelfed-app php artisan migrate:fresh`
 2. 데이터 시드: 해커톤 스크립트를 tinker로 파이프
    ```bash
-   cat seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
+   cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
    ```
-   (에이전트, 인플루언서, 더미 게시물 생성)
+   (에이전트, 인플루언서, 사진 게시물 생성 및 팔로우 연결)
+
+**빠른 부트스트랩**
+- `./scripts/setup_sns.sh`로 서브모듈 초기화 + `.env` 주입 + Caddy 설정 + 컨테이너 기동 + 시드를 한 번에 수행할 수 있음
+
+**Codex 스킬**
+- `.codex/skills/sns-environment/SKILL.md`에 정의된 `sns-environment` 스킬을 사용해 동일한 부트스트랩 절차를 재현할 수 있음
 
 **트러블슈팅**
 - **404 에러**: `.env`의 `APP_DOMAIN` 불일치 또는 오래된 라우트 캐시로 인한 경우가 많음
@@ -142,9 +150,10 @@ docker exec pixelfed-app php artisan <command>
 **빠른 참조**
 - 앱 URL: `https://localhost:8092`
 - 컨테이너 이름: `pixelfed-app`
+- 로그인 방식: 이메일 / 비밀번호 (`<username>@local.dev`)
 - 기본 비밀번호: `password`
-- 에이전트 계정: `agent1`, `agent2`...
-- 인플루언서 계정: `influencer1`...
+- 에이전트 계정 이메일: `agent1@local.dev`, `agent2@local.dev`...
+- 인플루언서 계정 이메일: `influencer1@local.dev`...
 
 ---
 
@@ -479,7 +488,7 @@ Instagram에서 인플루언서/팔로워 데이터를 수집하는 크롤러와
 
 - 루트 개요: `README.md`, `PLANS.md`, `PROJECT_DEFINITION.md`
 - 공유 계약: `shared/README.md`, `shared/simulation-schema.json`
-- 로컬 SNS 설정: `sns/README.md`, `sns/AGENTS.md`
+- 로컬 SNS 설정: `docs/components/sns.md`
 - 에이전트 시뮬레이션: `agent/README.md`, `agent/AGENTS.md`
 - 대시보드 UX: `search-dashboard/README.md`, `search-dashboard/AGENTS.md`
 - Instagram 크롤러: `insta-crawler/README.md`, `insta-crawler/PLANS.md`, `insta-crawler/AGENTS.md`

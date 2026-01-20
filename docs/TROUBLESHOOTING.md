@@ -7,12 +7,22 @@
 ### Case 1.1: SNS Unreachable (`ERR_CONNECTION_REFUSED`)
 - **Symptom**: `https://localhost:8092` 접속 불가
 - **Root Cause**: Pixelfed 컨테이너 미기동 또는 포트 충돌
-- **Resolution**:
+- **Diagnostic**:
   ```bash
   docker ps | rg pixelfed
   docker logs pixelfed-app --tail 20
   ./scripts/setup_sns.sh
   ```
+- **Resolution**:
+  1. 컨테이너 상태 확인 (Exited 상태인지 확인).
+  2. `pixelfed-db` 또는 `pixelfed-redis`가 `Created` 상태면 다음을 실행:
+     ```bash
+     docker-compose up -d db redis
+     ```
+  3. 환경변수 변경사항 반영을 위한 강제 재생성:
+     ```bash
+     docker-compose up -d --force-recreate
+     ```
 
 ### Case 1.2: SSL Certificate Errors
 - **Symptom**: 브라우저가 인증서 경고 표시
@@ -29,11 +39,11 @@
 - **Root Cause**: 시드 미실행, 계정 없음, 자격 증명 불일치
 - **Resolution**:
   ```bash
-  cd sns/pixelfed
-  cat ../seed_hackathon.php | docker-compose exec -T pixelfed php artisan tinker
+  cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
   ```
   - `agent/.env`의 `SNS_EMAIL`, `SNS_PASSWORD` 확인
   - `--headed` 플래그로 브라우저를 띄워 수동 확인
+  - 로그인 성공 여부를 수동 브라우저로 교차 검증 (`agent1@local.dev` / `password`, 이메일 로그인)
 
 ### Case 2.2: OpenAI 오류 (401/429)
 - **Symptom**: 액션 로그에 `openai_error` 표시
