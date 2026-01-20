@@ -23,9 +23,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
     followingIds.push(user.id);
 
     // Get posts from following + self
-    // Use named parameters properly with better-sqlite3 for IN clause involves a bit of work or string injection for safe IDs
-    // Since IDs are integers, this is safe enough if handled carefully, but better-sqlite3 doesn't support array binding directly for IN
-    // We will fetch all relevant posts
     const placeholders = followingIds.map(() => '?').join(',');
 
     const posts = db.prepare(`
@@ -39,17 +36,35 @@ export const load: PageServerLoad = async ({ cookies }) => {
         JOIN users u ON p.user_id = u.id
         WHERE p.user_id IN (${placeholders})
         ORDER BY p.created_at DESC
+        LIMIT 50
     `).all(user.id, ...followingIds) as any[];
 
-    // Attach comments
-    for (const post of posts) {
-        post.comments = db.prepare(`
+    // Optimized: Batch fetch comments to avoid N+1 problem
+    const postIds = posts.map(p => p.id);
+
+    let commentsByPostId: Record<number, any[]> = {};
+
+    if (postIds.length > 0) {
+        const commentPlaceholders = postIds.map(() => '?').join(',');
+        const allComments = db.prepare(`
             SELECT c.*, u.username, u.display_name
             FROM comments c
             JOIN users u ON c.user_id = u.id
-            WHERE c.post_id = ?
+            WHERE c.post_id IN (${commentPlaceholders})
             ORDER BY c.created_at ASC
-        `).all(post.id);
+        `).all(...postIds) as any[];
+
+        for (const comment of allComments) {
+            if (!commentsByPostId[comment.post_id]) {
+                commentsByPostId[comment.post_id] = [];
+            }
+            commentsByPostId[comment.post_id].push(comment);
+        }
+    }
+
+    // Attach comments to posts
+    for (const post of posts) {
+        post.comments = commentsByPostId[post.id] || [];
     }
 
     return {
@@ -63,18 +78,7 @@ export const actions = {
         cookies.delete('session', { path: '/' });
         throw redirect(303, '/');
     },
-    createPost: async ({ request, cookies }) => {
-        const username = cookies.get('session');
-        if (!username) return;
-        const user = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as any;
 
-        const data = await request.formData();
-        const content = data.get('content') as string;
-
-        if (content) {
-            db.prepare('INSERT INTO posts (user_id, content) VALUES (?, ?)').run(user.id, content);
-        }
-    },
     like: async ({ request, cookies }) => {
         const username = cookies.get('session');
         if (!username) return;

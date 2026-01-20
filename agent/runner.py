@@ -58,6 +58,12 @@ class EnvConfig:
     openai_computer_use_model: str
     openai_auto_ack_safety_checks: bool
     agent_log_level: str
+    # MCP configuration
+    playwright_mcp_url: str
+    mcp_require_approval: str
+    mcp_max_steps: int
+    mcp_step_delay_min: float
+    mcp_step_delay_max: float
 
 
 @dataclass
@@ -78,6 +84,7 @@ class SimulationConfig:
     save_screenshots: bool
     headless: bool
     max_concurrency: int
+    mcp_enabled: bool  # Use MCP-based agent instead of direct Playwright
 
 
 @dataclass
@@ -166,6 +173,12 @@ def load_env() -> EnvConfig:
         openai_computer_use_model=os.getenv("OPENAI_COMPUTER_USE_MODEL", "computer-use-preview").strip(),
         openai_auto_ack_safety_checks=parse_bool(os.getenv("OPENAI_AUTO_ACK_SAFETY_CHECKS"), False),
         agent_log_level=os.getenv("AGENT_LOG_LEVEL", "INFO").strip(),
+        # MCP configuration
+        playwright_mcp_url=os.getenv("PLAYWRIGHT_MCP_URL", "http://localhost:8931/mcp").strip(),
+        mcp_require_approval=os.getenv("MCP_REQUIRE_APPROVAL", "never").strip(),
+        mcp_max_steps=int(os.getenv("MCP_MAX_STEPS", "20")),
+        mcp_step_delay_min=float(os.getenv("MCP_STEP_DELAY_MIN", "1.0")),
+        mcp_step_delay_max=float(os.getenv("MCP_STEP_DELAY_MAX", "3.0")),
     )
 
 
@@ -1936,6 +1949,165 @@ async def run_crowd_agent(
     }
 
 
+async def run_mcp_agents(
+    env: EnvConfig,
+    config: SimulationConfig,
+    personas: list[Persona],
+    outputs_dir: Path,
+    repo_root: Path,
+    agent_logs: list[dict[str, Any]],
+    action_files: list[Path],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Run local Playwright agents with OpenAI decision making.
+
+    This function handles both hero and crowd agents using local Playwright
+    with OpenAI for action decisions. This avoids needing a public MCP server.
+    """
+    from local_agent import (
+        LocalPlaywrightAgent,
+        LocalAgentConfig,
+        Persona as LocalPersona,
+    )
+
+    # Build local config from env
+    local_config = LocalAgentConfig(
+        openai_api_key=env.openai_api_key,
+        openai_model=env.openai_model,
+        openai_base_url=env.openai_base_url,
+        sns_url=env.sns_url,
+        max_steps=env.mcp_max_steps,
+        step_delay_min=env.mcp_step_delay_min,
+        step_delay_max=env.mcp_step_delay_max,
+        headless=config.headless,
+        save_screenshots=config.save_screenshots,
+        output_dir=outputs_dir / config.run_id,
+    )
+
+    # Calculate total agents
+    total_agents = config.crowd_count + (1 if config.hero_enabled else 0)
+
+    # Build persona list for agents
+    agent_personas: list[LocalPersona] = []
+    if config.hero_enabled:
+        hero_persona = choose_persona(personas, config.hero_persona_id)
+        agent_personas.append(LocalPersona(
+            id=hero_persona.id,
+            name=hero_persona.name,
+            interests=hero_persona.interests,
+            tone=hero_persona.tone,
+            reaction_bias=hero_persona.reaction_bias,
+        ))
+
+    # Add crowd personas (cycling through available personas)
+    for i in range(config.crowd_count):
+        persona = personas[i % len(personas)]
+        agent_personas.append(LocalPersona(
+            id=persona.id,
+            name=persona.name,
+            interests=persona.interests,
+            tone=persona.tone,
+            reaction_bias=persona.reaction_bias,
+        ))
+
+    # Create runners
+    runners: list[LocalPlaywrightAgent] = []
+    for i, persona in enumerate(agent_personas):
+        is_hero = (i == 0 and config.hero_enabled)
+        runner = LocalPlaywrightAgent(
+            config=local_config,
+            persona=persona,
+            agent_index=i + 1,
+            is_hero=is_hero,
+        )
+        runners.append(runner)
+
+    # Run with semaphore for concurrency control
+    sem = asyncio.Semaphore(config.max_concurrency)
+
+    async def run_one(runner: LocalPlaywrightAgent) -> dict[str, Any]:
+        async with sem:
+            try:
+                return await runner.run_loop(
+                    max_steps=env.mcp_max_steps,
+                    max_time_seconds=config.duration * 60 if config.duration > 0 else None,
+                )
+            except Exception as exc:
+                logger.exception("Local Agent {} crashed: {}", runner.state.agent_id, exc)
+                return {
+                    "agentId": runner.state.agent_id,
+                    "personaId": runner.persona.id,
+                    "status": "crashed",
+                    "error": str(exc),
+                }
+
+    logger.info(
+        "Starting {} local Playwright agents with max_concurrency={}",
+        total_agents, config.max_concurrency,
+    )
+
+    results = await asyncio.gather(*[run_one(r) for r in runners])
+
+    # Process results
+    persona_traces: list[dict[str, Any]] = []
+    likes = 0
+    comments = 0
+
+    for i, (runner, result) in enumerate(zip(runners, results)):
+        # Count actions from logged data
+        agent_likes = sum(
+            1 for action in runner.state.actions_taken
+            if action.get("decision", {}).get("action") == "like"
+            and action.get("result", {}).get("success")
+        )
+        agent_comments = sum(
+            1 for action in runner.state.actions_taken
+            if action.get("decision", {}).get("action") == "comment"
+            and action.get("result", {}).get("success")
+        )
+        likes += agent_likes
+        comments += agent_comments
+
+        # Build trace
+        trace = {
+            "agentId": runner.state.agent_id,
+            "personaId": runner.persona.id,
+            "stepsCompleted": result.get("stepsCompleted", 0),
+            "endReason": result.get("endReason", "unknown"),
+            "actionsLogged": result.get("actionsLogged", 0),
+            "logFile": result.get("logFile"),
+        }
+        if result.get("status") == "crashed":
+            trace["error"] = result.get("error")
+        persona_traces.append(trace)
+
+        # Add to action files
+        log_path = runner.log_path
+        if log_path.exists():
+            action_files.append(log_path)
+
+        # Add to agent logs
+        agent_logs.append({
+            "timestamp": iso_now(),
+            "agentId": runner.state.agent_id,
+            "action": "local_agent_session_complete",
+            "detail": {
+                "stepsCompleted": result.get("stepsCompleted", 0),
+                "endReason": result.get("endReason"),
+            },
+        })
+
+    metrics = {
+        "reach": total_agents,
+        "engagement": likes + comments,
+        "engagementBreakdown": {
+            "likes": likes,
+            "comments": comments,
+        },
+    }
+
+    return persona_traces, metrics
+
+
 def build_base_payload(config: SimulationConfig) -> dict[str, Any]:
     created_at = iso_now()
     return {
@@ -1958,6 +2130,7 @@ def build_base_payload(config: SimulationConfig) -> dict[str, Any]:
                 "postContext": config.post_context,
                 "dryRun": config.dry_run,
                 "runId": config.run_id,
+                "mcpEnabled": config.mcp_enabled,
             },
         },
     }
@@ -1991,16 +2164,44 @@ async def run_simulation(config: SimulationConfig, personas: list[Persona]) -> R
 
     try:
         logger.info(
-            "Simulation start id={} run={} hero={} crowd={} dry_run={} headless={} model={}",
+            "Simulation start id={} run={} hero={} crowd={} dry_run={} headless={} mcp={} model={}",
             config.simulation_id,
             config.run_id,
             config.hero_enabled,
             config.crowd_count,
             config.dry_run,
             config.headless,
+            config.mcp_enabled,
             env.openai_model,
         )
-        if config.hero_enabled:
+
+        # Local Playwright agent execution path (with OpenAI decision making)
+        if config.mcp_enabled:
+            logger.info("Using local Playwright agents with OpenAI decision making")
+            persona_traces, metrics = await run_mcp_agents(
+                env,
+                config,
+                personas,
+                outputs_dir,
+                repo_root,
+                agent_logs,
+                action_files,
+            )
+            likes = metrics.get("engagementBreakdown", {}).get("likes", 0)
+            comments = metrics.get("engagementBreakdown", {}).get("comments", 0)
+            end_reason = "local_agent_execution"
+
+            base_payload.update(
+                {
+                    "status": "running",
+                    "progress": 90,
+                    "updatedAt": iso_now(),
+                }
+            )
+            write_json_atomic(simulation_path, base_payload)
+
+        # Traditional Playwright-based execution path
+        elif config.hero_enabled:
             hero_persona = choose_persona(personas, config.hero_persona_id)
             hero_decision, hero_action, hero_post_context, hero_post = await run_hero_agent(
                 env,
@@ -2087,17 +2288,24 @@ async def run_simulation(config: SimulationConfig, personas: list[Persona]) -> R
             )
             write_json_atomic(simulation_path, base_payload)
 
-        engagement = likes + comments
-        metrics = {
-            "reach": config.crowd_count + (1 if config.hero_enabled else 0),
-            "engagement": engagement,
-            "conversionEstimate": round(engagement * 0.05, 2),
-            "roas": round(engagement * 0.02, 2),
-            "engagementBreakdown": {
-                "likes": likes,
-                "comments": comments,
-            },
-        }
+        # Only calculate metrics if not using MCP (MCP already provides metrics)
+        if not config.mcp_enabled:
+            engagement = likes + comments
+            metrics = {
+                "reach": config.crowd_count + (1 if config.hero_enabled else 0),
+                "engagement": engagement,
+                "conversionEstimate": round(engagement * 0.05, 2),
+                "roas": round(engagement * 0.02, 2),
+                "engagementBreakdown": {
+                    "likes": likes,
+                    "comments": comments,
+                },
+            }
+        else:
+            # Add conversion estimates to MCP metrics
+            engagement = metrics.get("engagement", 0)
+            metrics["conversionEstimate"] = round(engagement * 0.05, 2)
+            metrics["roas"] = round(engagement * 0.02, 2)
 
         used_model = bool(env.openai_api_key and not config.dry_run)
         confidence = "medium" if used_model else "low"
@@ -2204,6 +2412,7 @@ def build_simulation_config(
     max_concurrency: int,
     simulation_id: str | None = None,
     run_id: str | None = None,
+    mcp_enabled: bool = False,
 ) -> SimulationConfig:
     return SimulationConfig(
         simulation_id=simulation_id or str(uuid.uuid4()),
@@ -2222,6 +2431,7 @@ def build_simulation_config(
         save_screenshots=save_screenshots,
         headless=headless,
         max_concurrency=max(1, max_concurrency),
+        mcp_enabled=mcp_enabled,
     )
 
 

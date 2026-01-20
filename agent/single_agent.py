@@ -1,9 +1,22 @@
+"""Single agent runner for testing.
+
+Usage:
+    python single_agent.py          # Traditional Playwright mode
+    python single_agent.py --mcp    # MCP-based mode
+"""
+
+import argparse
 import asyncio
 
 from runner import build_simulation_config, default_post_context, load_personas, run_simulation
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run a single hero agent")
+    parser.add_argument("--mcp", action="store_true", help="Use MCP-based execution")
+    parser.add_argument("--headed", action="store_true", help="Show browser window")
+    args = parser.parse_args()
+
     personas = load_personas()
     persona = personas[0]
     config = build_simulation_config(
@@ -19,8 +32,9 @@ def main() -> None:
         post_context=default_post_context(),
         dry_run=False,
         save_screenshots=True,
-        headless=True,
+        headless=not args.headed,
         max_concurrency=1,
+        mcp_enabled=args.mcp,
     )
     asyncio.run(run_simulation(config, personas))
 

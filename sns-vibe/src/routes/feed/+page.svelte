@@ -2,10 +2,10 @@
     import { enhance } from '$app/forms';
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
-    import { Textarea } from "$lib/components/ui/textarea";
+ 
     import { Card, CardContent, CardFooter, CardHeader } from "$lib/components/ui/card";
     import { Avatar, AvatarImage, AvatarFallback } from "$lib/components/ui/avatar";
-    import { Heart, MessageCircle, Send, LogOut, Image, Smile } from 'lucide-svelte';
+    import { Heart, MessageCircle, Send, LogOut } from 'lucide-svelte';
     
     export let data;
 
@@ -40,38 +40,7 @@
     </header>
 
     <main class="container max-w-2xl mx-auto px-4 py-8 space-y-8">
-        <!-- New Post -->
-        <Card class="border-0 shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-800 bg-white dark:bg-black overflow-hidden hover:shadow-md transition-shadow duration-300">
-            <CardContent class="pt-6">
-                <form action="?/createPost" method="POST" use:enhance class="space-y-4">
-                    <div class="flex gap-4">
-                        <Avatar class="h-10 w-10 mt-1">
-                             <AvatarFallback class="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
-                                {getInitials(data.user.username)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <Textarea 
-                            name="content" 
-                            placeholder="What's happening?" 
-                            class="min-h-[80px] text-lg resize-none border-0 focus-visible:ring-0 px-0 py-2 bg-transparent placeholder:text-neutral-400"
-                            id="new-post-input"
-                        />
-                    </div>
-                   
-                    <div class="flex justify-between items-center border-t border-neutral-100 dark:border-neutral-900 pt-4">
-                        <div class="flex gap-2 text-primary/60">
-                            <Button variant="ghost" size="icon" class="rounded-full h-8 w-8 hover:bg-blue-50 hover:text-blue-500" disabled>
-                                <Image class="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" class="rounded-full h-8 w-8 hover:bg-blue-50 hover:text-blue-500" disabled>
-                                <Smile class="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <Button type="submit" size="default" id="new-post-button" class="rounded-full px-6 font-semibold bg-blue-500 hover:bg-blue-600 transition-colors">Post</Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+
 
         <!-- Feed -->
         <div class="space-y-6" id="feed">
@@ -99,12 +68,12 @@
 
                     <CardFooter class="flex flex-col gap-0 pt-0">
                          <!-- Interaction Buttons -->
-                        <div class="w-full flex items-center gap-4 py-2 border-t border-neutral-100 dark:border-neutral-900">
-                             <form action="?/like" method="POST" use:enhance class="flex-1">
+                        <div class="w-full flex items-center gap-4 py-2 border-t border-neutral-100 dark:border-neutral-900 px-3">
+                             <form action="?/like" method="POST" use:enhance class="flex items-center">
                                 <input type="hidden" name="postId" value={post.id} />
                                 <Button 
                                     variant="ghost" 
-                                    class={`w-full gap-2 h-10 hover:bg-red-50 hover:text-red-500 group transition-colors ${post.is_liked ? 'text-red-500' : 'text-neutral-500'}`}
+                                    class={`gap-2 h-9 px-3 hover:bg-red-50 hover:text-red-600 group transition-all rounded-full ${post.is_liked ? 'text-red-500 bg-red-50' : 'text-neutral-500'}`}
                                     type="submit"
                                     id="like-button-{post.id}"
                                 >
@@ -113,24 +82,20 @@
                                 </Button>
                              </form>
 
-                             <Button 
-                                variant="ghost" 
-                                class="flex-1 gap-2 h-10 text-neutral-500 hover:bg-blue-50 hover:text-blue-500 group"
-                                on:click={() => document.getElementById(`comment-input-${post.id}`)?.focus()}
-                            >
-                                <MessageCircle class="h-5 w-5 group-hover:scale-110 transition-transform" />
+                             <div class="flex items-center gap-2 text-neutral-400 select-none">
+                                <MessageCircle class="h-5 w-5" />
                                 <span class="font-medium text-sm">{post.comments.length}</span>
-                            </Button>
+                             </div>
                         </div>
                         
                         <!-- Comments Section -->
-                        <div class="w-full bg-neutral-50 dark:bg-neutral-900/50 rounded-xl p-3 mt-2 space-y-4">
+                        <div class="w-full bg-neutral-50/50 dark:bg-neutral-900/30 border-t border-neutral-100 dark:border-neutral-800 p-4 space-y-4">
                             {#if post.comments.length > 0}
-                                <div class="space-y-3 pl-1 pr-1">
+                                <div class="space-y-3">
                                     {#each post.comments as comment}
-                                        <div class="flex gap-2 text-sm group">
-                                            <span class="font-bold text-neutral-900 dark:text-neutral-100">@{comment.username}</span>
-                                            <span class="text-neutral-700 dark:text-neutral-300">{comment.content}</span>
+                                        <div class="flex gap-2 text-sm group items-start">
+                                            <span class="font-bold text-neutral-900 dark:text-neutral-100 whitespace-nowrap">@{comment.username}</span>
+                                            <p class="text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-full break-words">{comment.content}</p>
                                         </div>
                                     {/each}
                                 </div>
@@ -142,11 +107,11 @@
                                 <Input 
                                     name="content" 
                                     placeholder="Write a comment..." 
-                                    class="h-10 bg-white dark:bg-black border-neutral-200 dark:border-neutral-800 rounded-full focus-visible:ring-blue-500 w-full"
+                                    class="h-10 bg-white dark:bg-black border-neutral-200 dark:border-neutral-800 rounded-full focus-visible:ring-blue-500 w-full shadow-sm"
                                     id="comment-input-{post.id}"
                                 />
-                                <Button type="submit" size="icon" variant="ghost" class="h-9 w-9 rounded-full text-blue-500 hover:bg-blue-50" id="comment-button-{post.id}">
-                                    <Send class="h-4 w-4" />
+                                <Button type="submit" size="icon" variant="ghost" class="h-10 w-10 shrink-0 rounded-full text-blue-500 hover:bg-blue-50" id="comment-button-{post.id}">
+                                    <Send class="h-5 w-5 ml-0.5" />
                                 </Button>
                             </form>
                         </div>

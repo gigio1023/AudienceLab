@@ -15,7 +15,7 @@ An ultra-lightweight, agent-friendly social media simulation platform built for 
 
 ### Agent-First Design
 - **No Complex Auth**: Simple username-based login. No passwords, emails, or 2FA.
-- **Predictable DOM**: All interactive elements have semantic IDs (e.g., `#like-button-123`, `#new-post-input`).
+- **Predictable DOM**: All interactive elements have semantic IDs (e.g., `#like-button-123`).
 - **Big Click Targets**: Buttons are sized appropriately for automated agents (Playwright/Puppeteer).
 - **Optimized Flows**: No modals, no "load more" buttons (infinite scroll or pagination handled simply), direct interactions.
 
@@ -26,7 +26,7 @@ An ultra-lightweight, agent-friendly social media simulation platform built for 
   - **Like/Unlike**: Instant toggle.
   - **Comment**: Threaded under posts.
   - **Follow/Unfollow**: manages feed content.
-  - **Post**: Basic text posts (Image URL support included in schema).
+
 
 ## 📁 Project Structure
 

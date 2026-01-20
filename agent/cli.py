@@ -44,6 +44,11 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--max-concurrency", type=int, default=6)
     run_parser.add_argument("--simulation-id", default=None)
     run_parser.add_argument("--run-id", default=None)
+    run_parser.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Use MCP-based Playwright agent execution (all agents use MCP tool calls)",
+    )
 
     smoke_parser = subparsers.add_parser("smoke-test", help="Quick dry-run validation")
     smoke_parser.add_argument("--verbose", action="store_true")
@@ -109,6 +114,7 @@ def main() -> None:
         max_concurrency=args.max_concurrency,
         simulation_id=args.simulation_id,
         run_id=args.run_id,
+        mcp_enabled=args.mcp,
     )
 
     if not hero_enabled and config.crowd_count == 0:
