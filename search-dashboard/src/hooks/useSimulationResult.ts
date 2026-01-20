@@ -28,7 +28,7 @@ export function useSimulationResult(simulationId: string, options: Options = {})
           throw new Error(`Simulation feed ${response.status}`);
         }
 
-        const data = (await response.json()) as SimulationResult;
+        const data = (await response.json()) as SimulationOutput;
         if (!isMounted) return;
         setResult(data);
         setLastUpdated(new Date().toISOString());

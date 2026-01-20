@@ -176,7 +176,7 @@ def load_env() -> EnvConfig:
         # MCP configuration
         playwright_mcp_url=os.getenv("PLAYWRIGHT_MCP_URL", "http://localhost:8931/mcp").strip(),
         mcp_require_approval=os.getenv("MCP_REQUIRE_APPROVAL", "never").strip(),
-        mcp_max_steps=int(os.getenv("MCP_MAX_STEPS", "20")),
+        mcp_max_steps=int(os.getenv("MCP_MAX_STEPS", "35")),
         mcp_step_delay_min=float(os.getenv("MCP_STEP_DELAY_MIN", "1.0")),
         mcp_step_delay_max=float(os.getenv("MCP_STEP_DELAY_MAX", "3.0")),
     )

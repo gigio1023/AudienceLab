@@ -1,0 +1,54 @@
+{
+  "simulationId": "ec43dbdc-2b8d-441d-9ac6-a7fe1e1e000c",
+  "status": "completed",
+  "progress": 100,
+  "createdAt": "2026-01-20T06:47:56.139673+00:00",
+  "updatedAt": "2026-01-20T06:48:26.420061+00:00",
+  "config": {
+    "goal": "Single hero agent run on local SNS",
+    "budget": 10,
+    "duration": 0.5,
+    "targetPersona": "vegan-mom",
+    "parameters": {
+      "agentCount": 1,
+      "messageTone": "positive and supportive",
+      "heroEnabled": true,
+      "heroMode": "auto",
+      "crowdCount": 0,
+      "postContext": "Local SNS campaign post about an eco-friendly travel bag with bright visuals, short caption, and a call-to-action to learn more.",
+      "dryRun": false,
+      "runId": "3541bafa-ed0d-45ed-ab23-f005c990c941",
+      "mcpEnabled": true
+    }
+  },
+  "result": {
+    "metrics": {
+      "reach": 1,
+      "engagement": 1,
+      "conversionEstimate": 0.05,
+      "roas": 0.02
+    },
+    "confidenceLevel": "medium",
+    "agentLogs": [
+      {
+        "timestamp": "2026-01-20T06:48:26.418850+00:00",
+        "agentId": "local-hero-001",
+        "action": "local_agent_session_complete",
+        "detail": {
+          "stepsCompleted": 2,
+          "endReason": "max_time"
+        }
+      }
+    ],
+    "personaTraces": [
+      {
+        "agentId": "local-hero-001",
+        "personaId": "vegan-mom",
+        "stepsCompleted": 2,
+        "endReason": "max_time",
+        "actionsLogged": 2,
+        "logFile": "/Users/user/git/AudienceLab/agent/outputs/3541bafa-ed0d-45ed-ab23-f005c990c941/local-hero-001/actions.jsonl"
+      }
+    ]
+  }
+}

@@ -1,6 +1,5 @@
 import os
 import json
-import glob
 import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
@@ -13,13 +12,18 @@ if agent_env.exists():
     load_dotenv(agent_env)
 
 # Config
-DATA_DIR = Path("../agent/outputs/multi_agent_test")
+DATA_DIR = Path("../search-dashboard/public/simulation")
+SEED_POSTS_PATH = Path("../sns-vibe/seeds/posts.json")
+FEED_INDEX = DATA_DIR / "index.json"
+MARKETING_TAGS = ("#ad", "#sponsored")
+seed_ids = set()
+marketing_post_ids = set()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", None)
 
-if not OPENAI_API_KEY and not OPENAI_BASE_URL:
-    print("Warning: OPENAI_API_KEY not found. LLM Judge will fail.")
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY is required to run the evaluator.")
 
 client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL if OPENAI_BASE_URL else None)
 
@@ -58,16 +62,52 @@ def evaluate_comment(reasoning, comment):
         print(f"LLM Call failed: {e}")
         return None
 
+def load_feed_files():
+    if FEED_INDEX.exists():
+        with open(FEED_INDEX, "r") as file:
+            index = json.load(file)
+        return [DATA_DIR / name for name in index.get("files", [])]
+    return list(DATA_DIR.glob("local-*.jsonl"))
+
+def normalize_target_id(target):
+    if not target:
+        return None
+    if target in seed_ids:
+        return target
+    if target.startswith("post-"):
+        raw = target[len("post-"):]
+        if raw.isdigit():
+            return raw.zfill(3)
+        return raw
+    return target
+
+def is_marketing_post(post_id):
+    return post_id in marketing_post_ids
+
 def main():
+    if not SEED_POSTS_PATH.exists():
+        print(f"Missing seed posts file: {SEED_POSTS_PATH}")
+        return
+
+    with open(SEED_POSTS_PATH, "r") as file:
+        seed_posts = json.load(file)
+
+    global seed_ids, marketing_post_ids
+    seed_ids = {post["id"] for post in seed_posts}
+    marketing_post_ids = {
+        post["id"]
+        for post in seed_posts
+        if any(tag in post.get("content", "").lower() for tag in MARKETING_TAGS)
+    }
+
     actions = []
-    # Search for actions.jsonl in subdirectories
-    files = glob.glob(str(DATA_DIR / "**" / "actions.jsonl"), recursive=True)
-    
+    files = load_feed_files()
+
     print(f"Found {len(files)} log files in {DATA_DIR}")
-    
+
     for f in files:
-        agent_id = Path(f).parent.name
-        with open(f, 'r') as file:
+        agent_id = f.stem
+        with open(f, "r") as file:
             for line in file:
                 try:
                     data = json.loads(line)
@@ -75,13 +115,18 @@ def main():
                     decision = data.get("decision", {})
                     result = data.get("result", {})
                     
+                    target = decision.get("target")
+                    normalized_target = normalize_target_id(target)
+
                     row = {
-                        "agent_id": agent_id,
+                        "agent_id": data.get("agentId", agent_id),
                         "timestamp": data.get("timestamp"),
                         "step": data.get("step"),
                         "action": decision.get("action"),
                         "success": result.get("success", False),
-                        "target": decision.get("target"),
+                        "target": target,
+                        "normalized_target": normalized_target,
+                        "is_marketing_post": is_marketing_post(normalized_target),
                         "comment_text": result.get("comment") or decision.get("comment_text"), # Use result comment if available, else decision
                         "reasoning": decision.get("reasoning")
                     }
@@ -108,6 +153,15 @@ def main():
     engagement_count = len(engagements)
     # Engagement Rate: Successful Interactions / Total Steps
     engagement_rate = engagement_count / total_steps if total_steps > 0 else 0
+
+    marketing_engagements = engagements[
+        (engagements['is_marketing_post'] == True) &
+        (engagements['action'].isin(['like', 'comment']))
+    ]
+    marketing_engagement_count = len(marketing_engagements)
+    marketing_engagement_rate = (
+        marketing_engagement_count / total_steps if total_steps > 0 else 0
+    )
     
     # Action Distribution
     action_counts = df.groupby(['action', 'success']).size().unstack(fill_value=0)
@@ -117,14 +171,17 @@ def main():
     print(f"Total Steps: {total_steps}")
     print(f"Total Engagements (Like/Comment/Follow): {engagement_count}")
     print(f"Engagement Rate: {engagement_rate:.2%}")
+    print(f"Marketing Engagements (Like/Comment): {marketing_engagement_count}")
+    print(f"Marketing Engagement Rate: {marketing_engagement_rate:.2%}")
     print("\nAction Distribution:")
     print(action_counts)
-    
+
     # 2. LLM Judge on Comments
-    # We only evalaute successful comments that have text
+    # We only evaluate successful comments that have text on marketing posts
     comments = df[
         (df['action'] == 'comment') & 
         (df['success'] == True) & 
+        (df['is_marketing_post'] == True) &
         (df['comment_text'].notna()) & 
         (df['comment_text'] != "")
     ]
@@ -149,21 +206,21 @@ def main():
                 })
                 print(f"[{row['agent_id']}]: R={res.relevance_score} T={res.tone_score} C={res.consistency_score}")
     else:
-        print("\nNo successful comments found to evaluate.")
+        print("\nNo successful marketing comments found to evaluate.")
 
     # 3. Verdict & Grading System
     print("\n=== Performance Verdict (종합 평가) ===")
     
     # Engagement Grade
-    if engagement_rate >= 0.5:
+    if marketing_engagement_rate >= 0.5:
         eng_grade = "High (적극적)"
-        eng_msg = "에이전트가 매우 적극적으로 상호작용하고 있습니다."
-    elif engagement_rate >= 0.2:
+        eng_msg = "마케팅 포스트에 대해 매우 적극적으로 상호작용하고 있습니다."
+    elif marketing_engagement_rate >= 0.2:
         eng_grade = "Medium (보통)"
-        eng_msg = "에이전트가 적절한 수준의 상호작용을 보입니다."
+        eng_msg = "마케팅 포스트에 대해 적절한 수준의 상호작용을 보입니다."
     else:
         eng_grade = "Low (소극적)"
-        eng_msg = "에이전트의 상호작용 비율이 낮습니다. 개선이 필요할 수 있습니다."
+        eng_msg = "마케팅 포스트에 대한 상호작용 비율이 낮습니다. 개선이 필요할 수 있습니다."
 
     print(f"Engagement Level: {eng_grade}")
     print(f"Comment: {eng_msg}")
@@ -195,50 +252,11 @@ def main():
         print(f"Quality Grade: {quality_grade}")
         print(f"Comment: {quality_msg}")
     
-    # 4. Save Reports
-    
-    # CSV Report of Judgments
     if judge_results:
-        judged_df.to_csv("comment_quality_eval.csv", index=False)
         print("\n--- Average Quality Scores ---")
         print(avg_scores)
     else:
         avg_scores = None
-
-    # Markdown Summary
-    with open("evaluation_report.md", "w") as f:
-        f.write("# AudienceLab Agent Evaluation Report\n\n")
-        
-        f.write("## 1. Executive Summary (종합 평가)\n")
-        f.write("| Metric | Score | Grade | Verdict |\n")
-        f.write("| :--- | :--- | :--- | :--- |\n")
-        f.write(f"| **Engagement Rate** | {engagement_rate:.1%} | **{eng_grade}** | {eng_msg} |\n")
-        if avg_scores is not None:
-             f.write(f"| **Interaction Quality** | {avg_quality_score:.2f}/5.0 | **{quality_grade}** | {quality_msg} |\n")
-        else:
-             f.write(f"| **Interaction Quality** | N/A | N/A | 평가할 댓글이 없습니다. |\n")
-
-        f.write("\n## 2. Quantitative Metrics (정량 지표)\n")
-        f.write(f"- **Total Agents Active**: {total_agents}\n")
-        f.write(f"- **Total recorded steps**: {total_steps}\n")
-        f.write(f"- **Total Successful Engagements**: {engagement_count}\n")
-        
-        f.write("\n### Action Breakdown\n")
-        f.write(action_counts.to_markdown())
-        
-        f.write("\n\n## 3. Qualitative Analysis (정성 평가 - LLM)\n")
-        if avg_scores is not None:
-            f.write("### Average Scores (1-5)\n")
-            f.write(f"- **Relevance**: {avg_scores['relevance']:.2f}\n")
-            f.write(f"- **Tone**: {avg_scores['tone']:.2f}\n")
-            f.write(f"- **Consistency**: {avg_scores['consistency']:.2f}\n")
-            
-            f.write("\n### Detailed Comments Evaluation\n")
-            f.write(judged_df[['agent_id', 'comment', 'relevance', 'tone', 'consistency', 'explanation']].to_markdown())
-        else:
-            f.write("No comments were available for qualitative evaluation.\n")
-
-    print("\nReport saved to evaluation_report.md and comment_quality_eval.csv")
 
 if __name__ == "__main__":
     main()

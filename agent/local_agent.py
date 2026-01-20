@@ -44,7 +44,7 @@ ACTION_TYPES = ["like", "comment", "follow", "scroll_down", "scroll_up", "noop",
 MAX_CONSECUTIVE_FAILURES = 3
 
 # Default max steps per agent loop
-DEFAULT_MAX_STEPS = 20
+DEFAULT_MAX_STEPS = 35
 
 # Exploration phase configuration
 EXPLORATION_STEPS = 5  # First N steps are exploration phase
@@ -61,6 +61,15 @@ ENGAGEMENT_FOLLOW_WEIGHT = 5   # % weight for follow in engagement
 # Jinja2 environment
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 _jinja_env: Environment | None = None
+
+# Session intent defaults (lightly randomized to avoid robotic patterns)
+SESSION_INTENTS = [
+    "catch up on friends",
+    "discover new creators",
+    "look for tips and inspiration",
+    "skim quickly while waiting",
+    "relax and browse",
+]
 
 
 def get_jinja_env() -> Environment:
@@ -168,6 +177,7 @@ class AgentState:
     is_logged_in: bool = False
     last_error: str | None = None
     page_content: str = ""
+    session_intent: str = ""
 
 
 @dataclass
@@ -234,6 +244,7 @@ def build_decision_system_prompt(
         actions=ACTION_TYPES,
         step_count=step_count,
         max_steps=max_steps,
+        local_time=datetime.now().strftime("%H:%M"),
         exploration_steps=EXPLORATION_STEPS,
         exploration_scroll_weight=EXPLORATION_SCROLL_WEIGHT,
         exploration_noop_weight=EXPLORATION_NOOP_WEIGHT,
@@ -258,7 +269,27 @@ def build_decision_user_prompt(
     limited_content = page_content[:4000]
 
     phase = "exploration" if state.step_count <= EXPLORATION_STEPS else "engagement"
-    recent_actions = [a.get("action") for a in state.actions_taken[-5:]]
+    recent_actions = []
+    for entry in state.actions_taken[-5:]:
+        action = (
+            entry.get("decision", {}).get("action")
+            or entry.get("result", {}).get("action")
+            or entry.get("action")
+        )
+        if action:
+            recent_actions.append(action)
+    recent_targets = [
+        a.get("decision", {}).get("target")
+        for a in state.actions_taken[-5:]
+        if a.get("decision", {}).get("target")
+    ]
+    engagement_level = (state.persona.engagement_level or "medium").lower()
+    if engagement_level == "high":
+        suggested_stop_step = max_steps - max(2, int(max_steps * 0.1))
+    elif engagement_level == "low":
+        suggested_stop_step = max(3, int(max_steps * 0.5))
+    else:
+        suggested_stop_step = max(4, int(max_steps * 0.7))
 
     return template.render(
         persona=state.persona,
@@ -267,8 +298,11 @@ def build_decision_user_prompt(
         phase=phase,
         actions_count=len(state.actions_taken),
         recent_actions=recent_actions,
+        recent_targets=[t for t in recent_targets if t],
         page_content=limited_content,
         exploration_steps=EXPLORATION_STEPS,
+        suggested_stop_step=suggested_stop_step,
+        session_intent=state.session_intent,
     )
 
 
@@ -303,6 +337,59 @@ def parse_action_decision(response_text: str) -> ActionDecision:
         logger.warning("Failed to parse action: {} - {}", e, response_text[:200])
 
     return ActionDecision(action="noop", reasoning="Parse failed")
+
+
+def extract_response_text(response: Any) -> str:
+    """Extract text content from OpenAI response."""
+    if hasattr(response, "output_text"):
+        text_value = getattr(response, "output_text")
+        if isinstance(text_value, str) and text_value:
+            return text_value
+
+    try:
+        if hasattr(response, "model_dump"):
+            payload = response.model_dump()
+        elif isinstance(response, dict):
+            payload = response
+        else:
+            return ""
+
+        output = payload.get("output", [])
+        texts = []
+
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            item_type = item.get("type")
+            if item_type == "output_text":
+                texts.append(str(item.get("text") or ""))
+            elif item_type == "message":
+                for part in item.get("content", []) or []:
+                    if isinstance(part, dict) and part.get("type") in {"output_text", "text"}:
+                        texts.append(str(part.get("text") or ""))
+
+        return "\n".join(texts).strip()
+    except Exception:
+        return ""
+
+
+def response_to_dict(response: Any) -> dict[str, Any]:
+    """Convert response to dictionary."""
+    if hasattr(response, "model_dump"):
+        return response.model_dump()
+    if isinstance(response, dict):
+        return response
+    if hasattr(response, "to_dict"):
+        return response.to_dict()
+    return {}
+
+
+def pick_session_intent(persona: Persona) -> str:
+    """Choose a light session intent based on persona interests."""
+    if persona.interests:
+        topic = random.choice(persona.interests)
+        return f"browse for {topic} posts"
+    return random.choice(SESSION_INTENTS)
 
 
 async def extract_page_content(page: Page) -> str:
@@ -378,6 +465,7 @@ class LocalPlaywrightAgent:
             persona=persona,
             username=username,
             password=DEFAULT_PASSWORD,
+            session_intent=pick_session_intent(persona),
         )
 
         # Browser resources (set during run)
@@ -417,7 +505,7 @@ class LocalPlaywrightAgent:
             logger.warning("Screenshot failed: {}", e)
             return None
 
-    async def _get_decision(self, page_content: str) -> ActionDecision:
+    async def _get_decision(self, page_content: str) -> tuple[ActionDecision, str, dict[str, Any]]:
         """Get action decision from OpenAI using structured output."""
         try:
             system_prompt = build_decision_system_prompt(
@@ -441,16 +529,26 @@ class LocalPlaywrightAgent:
                 ],
                 text_format=ActionResponse,
             )
+            raw_text = extract_response_text(response)
+            raw_response = response_to_dict(response)
             parsed = response.output_parsed
-            return ActionDecision(
-                action=parsed.action,
-                target=parsed.target,
-                comment_text=parsed.comment_text,
-                reasoning=parsed.reasoning,
+            return (
+                ActionDecision(
+                    action=parsed.action,
+                    target=parsed.target,
+                    comment_text=parsed.comment_text,
+                    reasoning=parsed.reasoning,
+                ),
+                raw_text,
+                raw_response,
             )
         except Exception as e:
             logger.error("Decision call failed: {}", e)
-            return ActionDecision(action="noop", reasoning=f"API error: {e}")
+            return (
+                ActionDecision(action="noop", reasoning=f"API error: {e}"),
+                "",
+                {"error": str(e)},
+            )
 
     def _extract_post_id(self, target: str) -> str:
         """Extract numeric post ID from target string."""
@@ -652,12 +750,16 @@ class LocalPlaywrightAgent:
             self.state.page_content = page_content
 
             # Get decision from model
-            decision = await self._get_decision(page_content)
+            decision, raw_text, raw_response = await self._get_decision(page_content)
             step_result["decision"] = {
                 "action": decision.action,
                 "target": decision.target,
                 "comment_text": decision.comment_text,
                 "reasoning": decision.reasoning,
+            }
+            step_result["llm"] = {
+                "raw_text": raw_text,
+                "raw_response": raw_response,
             }
 
             # Execute the action
@@ -758,6 +860,11 @@ class LocalPlaywrightAgent:
                     self.config.step_delay_min,
                     self.config.step_delay_max,
                 )
+                engagement_level = (self.persona.engagement_level or "medium").lower()
+                if engagement_level == "high":
+                    delay *= 0.7
+                elif engagement_level == "low":
+                    delay *= 1.3
                 await asyncio.sleep(delay)
 
             # Cleanup

@@ -1,15 +1,22 @@
-import { mockSimulation } from "@/data/mockSimulation";
 import { useActivityFeedIndex } from "@/hooks/useActivityFeedIndex";
 import { useAgentActivityFeed } from "@/hooks/useAgentActivityFeed";
 import { useSimulationResult } from "@/hooks/useSimulationResult";
+import personasData from "../../sns-vibe/seeds/personas.json";
 
-const influencer = {
-  name: "Lia Stone",
-  handle: "@lia.stone",
-  focus: "Minimalist skincare + wellness"
+type PersonaSeed = {
+  username: string;
+  age_range: string;
+  location: string;
+  occupation: string;
+  personality_traits: string[];
+  communication_style: string;
+  interests: string[];
+  preferred_content_types: string[];
+  engagement_level: string;
+  posting_frequency: string;
+  active_hours: string;
 };
 
-const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const formatNumber = (value: number) => numberFormatter.format(value);
 const defaultActionCosts: Record<string, number> = {
@@ -25,11 +32,11 @@ const defaultActionCosts: Record<string, number> = {
 export default function App() {
   const simulationId = import.meta.env.VITE_SIMULATION_ID ?? "latest";
   const { result, status, lastUpdated } = useSimulationResult(simulationId, { intervalMs: 2000 });
-  const simulation = result ?? mockSimulation;
+  const simulation = result;
   const { index: activityIndex } = useActivityFeedIndex({ intervalMs: 5000 });
   const envFiles = (import.meta.env.VITE_AGENT_FEEDS ?? "agent-01.jsonl,agent-02.jsonl,agent-03.jsonl")
     .split(",")
-    .map(item => item.trim())
+    .map((item: string) => item.trim())
     .filter(Boolean);
   const agentFiles = activityIndex?.files?.length ? activityIndex.files : envFiles;
   const {
@@ -80,13 +87,12 @@ export default function App() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6);
   const activeAgentCount = agentSummaries.length;
-  const actionCountsForBudget = activityEvents.length ? actionTotals : simulation.metrics.actions;
+  const actionCountsForBudget = Object.keys(actionTotals).length ? actionTotals : {};
   const actionCosts = {
-    ...defaultActionCosts,
-    ...(simulation.config.action_costs ?? {})
+    ...defaultActionCosts
   };
-  const budgetTotal = simulation.config.budget_total ?? 0;
-  const budgetUnit = simulation.config.budget_unit ?? "credits";
+  const budgetTotal = 500;
+  const budgetUnit = "";
   const budgetUsedRaw = Object.entries(actionCountsForBudget).reduce((sum, [action, count]) => {
     const cost = actionCosts[action] ?? 1;
     return sum + cost * count;
@@ -94,34 +100,45 @@ export default function App() {
   const budgetUsed = budgetTotal ? Math.min(budgetUsedRaw, budgetTotal) : budgetUsedRaw;
   const budgetRatio = budgetTotal ? Math.min(1, budgetUsed / budgetTotal) : 0;
   const budgetLabel = budgetTotal
-    ? `${formatNumber(budgetUsed)} / ${formatNumber(budgetTotal)} ${budgetUnit}`
-    : `${formatNumber(budgetUsed)} ${budgetUnit}`;
+    ? `${formatNumber(budgetUsed)} / ${formatNumber(budgetTotal)}${budgetUnit ? ` ${budgetUnit}` : ""}`
+    : `${formatNumber(budgetUsed)}${budgetUnit ? ` ${budgetUnit}` : ""}`;
   const budgetPercentLabel = budgetTotal ? `${(budgetRatio * 100).toFixed(1)}%` : "n/a";
+  const metrics = simulation?.result?.metrics;
+  const confidenceLevel = simulation?.result?.confidenceLevel ?? "unknown";
   const statCards = [
     {
-      label: "Positive rate",
-      value: formatPercent(simulation.metrics.positive_rate)
+      label: "Reach",
+      value: typeof metrics?.reach === "number" ? formatNumber(metrics.reach) : "—"
     },
     {
-      label: "Engagement rate",
-      value: formatPercent(simulation.metrics.engagement_rate)
+      label: "Engagement",
+      value: typeof metrics?.engagement === "number" ? formatNumber(metrics.engagement) : "—"
     },
     {
-      label: "Sentiment score",
-      value: formatPercent(simulation.metrics.sentiment_score)
+      label: "Conversion est.",
+      value: typeof metrics?.conversionEstimate === "number" ? formatNumber(metrics.conversionEstimate) : "—"
     },
     {
-      label: "Actions",
-      value: `${actionCountsForBudget.like ?? 0} likes · ${actionCountsForBudget.comment ?? 0} comments · ${actionCountsForBudget.skip ?? 0} skips`
+      label: "ROAS",
+      value: typeof metrics?.roas === "number" ? formatNumber(metrics.roas) : "—"
     },
     {
-      label: "Active agents",
-      value: activeAgentCount ? `${activeAgentCount} live` : `${simulation.metrics.total_agents}`
+      label: "Confidence",
+      value: confidenceLevel
     }
   ];
   const latestActivity = activityEvents[0];
   const feedLabel = status === "error" ? "feed error" : status === "loading" ? "connecting" : "live";
   const activityLabel = activityStatus === "error" ? "feed error" : activityStatus === "loading" ? "connecting" : "live";
+  const postContext = simulation?.config.parameters?.postContext ?? "";
+  const handleMatch = postContext.match(/@([a-zA-Z0-9._-]+)/);
+  const influencerHandle = handleMatch ? `@${handleMatch[1]}` : "unknown";
+  const influencer = {
+    name: simulation?.config.targetPersona ?? "Simulation pending",
+    handle: influencerHandle,
+    focus: simulation?.config.goal ?? "Waiting for simulation data"
+  };
+  const personas = (personasData as PersonaSeed[]).slice(0, 3);
 
   return (
     <div className="app-shell">
@@ -156,13 +173,15 @@ export default function App() {
           <div className="stats-grid">
             <div className="stat-card">
               <span className="stat-label">Status</span>
-              <span className="stat-value">{simulation.status}</span>
-              <span className="stat-note">Simulation ID: {simulation.simulationId}</span>
+              <span className="stat-value">{simulation?.status ?? "loading"}</span>
+              <span className="stat-note">Simulation ID: {simulation?.simulationId ?? simulationId}</span>
             </div>
             <div className="stat-card">
               <span className="stat-label">Agents</span>
-              <span className="stat-value">{simulation.metrics.total_agents}</span>
-              <span className="stat-note">Target: {simulation.config.agent_count}</span>
+              <span className="stat-value">{activeAgentCount || simulation?.config.parameters?.agentCount || "—"}</span>
+              <span className="stat-note">
+                Target: {simulation?.config.parameters?.agentCount ?? "waiting"}
+              </span>
             </div>
             {statCards.map(card => (
               <div key={card.label} className="stat-card">
@@ -173,7 +192,7 @@ export default function App() {
           </div>
           <div className="progress-row">
             <div className="progress-meta">
-              <span>Budget used</span>
+              <span>Budget used (action credits)</span>
               <span>{budgetLabel}</span>
             </div>
             <div className="progress-bar">
@@ -293,16 +312,24 @@ export default function App() {
             <p>Definitions used by the simulation agents.</p>
           </div>
           <div className="persona-grid">
-            {simulation.agents.map(agent => (
-              <div key={agent.persona_id} className="persona-card">
+            {personas.map(persona => (
+              <div key={persona.username} className="persona-card">
                 <div className="persona-header">
                   <div>
-                    <strong>{agent.persona_name}</strong>
-                    <span className="persona-id">{agent.persona_id}</span>
+                    <strong>{persona.username}</strong>
+                    <span className="persona-id">{persona.occupation}</span>
                   </div>
-                  <span className="persona-tone">{agent.reaction}</span>
+                  <span className="persona-tone">{persona.communication_style}</span>
                 </div>
-                <p className="persona-description">{agent.reasoning}</p>
+                <p className="persona-description">
+                  {persona.age_range} · {persona.location} · {persona.engagement_level} engagement
+                </p>
+                <p className="persona-description">
+                  Traits: {persona.personality_traits.slice(0, 3).join(", ")}
+                </p>
+                <p className="persona-description">
+                  Interests: {persona.interests.slice(0, 3).join(", ")}
+                </p>
               </div>
             ))}
           </div>

@@ -141,7 +141,7 @@ SNS_EMAIL=local-hero-001@example.com
 SNS_PASSWORD=password
 
 # Agent Configuration
-MCP_MAX_STEPS=20
+MCP_MAX_STEPS=35
 MCP_STEP_DELAY_MIN=1.0
 MCP_STEP_DELAY_MAX=3.0
 ```
@@ -172,7 +172,7 @@ uv run python cli.py run --crowd-count 9 --max-concurrency 4
 | `SNS_URL` | `http://localhost:8383` | SNS-Vibe server URL |
 | `SNS_EMAIL` | `local-hero-001@example.com` | Login email for hero agent |
 | `SNS_PASSWORD` | `password` | Login password |
-| `MCP_MAX_STEPS` | `20` | Maximum steps per agent |
+| `MCP_MAX_STEPS` | `35` | Maximum steps per agent |
 | `MCP_STEP_DELAY_MIN` | `1.0` | Minimum delay between steps (seconds) |
 | `MCP_STEP_DELAY_MAX` | `3.0` | Maximum delay between steps (seconds) |
 | `MCP_REQUIRE_APPROVAL` | `never` | Approval mode (never/always) |

@@ -3,6 +3,8 @@
 - Phase: {{ phase }}
 - Actions taken so far: {{ actions_count }}
 - Recent actions: {{ recent_actions | join(', ') if recent_actions else 'None' }}
+- Recent targets: {{ recent_targets | join(', ') if recent_targets else 'None' }}
+- Session intent: {{ session_intent }}
 
 ## Current Page Content (This is ALL you can see)
 {{ page_content }}
@@ -11,11 +13,13 @@
 As {{ persona.username }} ({{ persona.occupation }}), decide what action to take.
 
 Remember:
-- You can ONLY see what's shown in "Current Page Content" above
-- Look at the post content, usernames, and topics
-- Consider if posts match your interests: {{ persona.interests | join(', ') }}
-- {% if step_count <= exploration_steps %}You're still exploring - prefer scrolling to see more content{% else %}Be selective based on your tendencies (like: {{ persona.like_tendency }}, comment: {{ persona.comment_tendency }}){% endif %}
-- Use "done" when you've browsed enough
+- You can ONLY see what's shown in "Current Page Content" above.
+- Look for real post IDs (e.g., post-17). Use those in "target".
+- If no post IDs are visible, scroll or noop.
+- Stay consistent with your interests: {{ persona.interests | join(', ') }}.
+- Avoid repeating the same action or target you used very recently.
+- {% if step_count <= exploration_steps %}You're still exploring - prefer scrolling to see more content.{% else %}Be selective based on your tendencies (like: {{ persona.like_tendency }}, comment: {{ persona.comment_tendency }}).{% endif %}
+- If you have already browsed enough, you may use "done". Suggested stop after step {{ suggested_stop_step }}.
 
 Respond with ONLY valid JSON:
 {"action": "<type>", "target": "<id or null>", "comment_text": "<text or null>", "reasoning": "<why>"}

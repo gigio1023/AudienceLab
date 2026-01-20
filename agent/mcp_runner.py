@@ -33,11 +33,20 @@ ACTION_TYPES = ["like", "comment", "follow", "scroll_up", "scroll_down", "noop"]
 MAX_CONSECUTIVE_FAILURES = 3
 
 # Default max steps per agent loop
-DEFAULT_MAX_STEPS = 20
+DEFAULT_MAX_STEPS = 35
 
 # Default step delay range (seconds)
 DEFAULT_STEP_DELAY_MIN = 1.0
 DEFAULT_STEP_DELAY_MAX = 3.0
+
+# Session intent defaults (lightly randomized to avoid robotic patterns)
+SESSION_INTENTS = [
+    "catch up on friends",
+    "discover new creators",
+    "look for tips and inspiration",
+    "skim quickly while waiting",
+    "relax and browse",
+]
 
 
 @dataclass
@@ -77,11 +86,20 @@ class AgentState:
     actions_taken: list[dict[str, Any]]
     is_logged_in: bool
     last_error: str | None
+    session_intent: str
 
 
 def iso_now() -> str:
     """Return current UTC time in ISO format."""
     return datetime.now(timezone.utc).isoformat()
+
+
+def pick_session_intent(persona: Persona) -> str:
+    """Choose a light session intent based on persona interests."""
+    if persona.interests:
+        topic = random.choice(persona.interests)
+        return f"browse for {topic} posts"
+    return random.choice(SESSION_INTENTS)
 
 
 def load_mcp_config() -> MCPConfig:
@@ -121,7 +139,7 @@ def build_mcp_tools(config: MCPConfig) -> list[dict[str, Any]]:
     ]
 
 
-def build_system_prompt(persona: Persona, config: MCPConfig) -> str:
+def build_system_prompt(persona: Persona, config: MCPConfig, session_intent: str) -> str:
     """Build system prompt for the MCP agent."""
     return f"""You are a social media user controlling a browser through Playwright MCP tools.
 You have a specific persona and should act according to it.
@@ -131,21 +149,28 @@ You have a specific persona and should act according to it.
 - Interests: {', '.join(persona.interests)}
 - Tone: {persona.tone}
 - Reaction bias: {persona.reaction_bias}
+- Session intent: {session_intent}
 
 ## Rules
-1. You are browsing a local SNS at {config.sns_url}
-2. Do NOT navigate to external sites or domains
-3. Available actions: like, comment, follow, scroll_up, scroll_down, noop
-4. Make decisions based on your persona's interests and reaction bias
-5. If you have a positive bias, you're more likely to like/comment
-6. If you have a negative bias, you're more critical and selective
-7. Act naturally - don't like/comment on everything
-8. If an action fails, don't retry - just move on
+1. You are browsing a local SNS at {config.sns_url}.
+2. Do NOT navigate to external sites or domains.
+3. Available actions: like, comment, follow, scroll_up, scroll_down, noop.
+4. Make decisions based on your persona's interests and reaction bias.
+5. Act naturally - don't like/comment on everything.
+6. Avoid repeating the same action more than twice in a row.
+7. If an action fails, don't retry - just move on.
 
 ## Action Guidelines by Persona Bias
-- positive: Like ~60% of relevant posts, comment ~30%, follow influencers
+- positive: Like ~60% of relevant posts, comment ~30%, follow occasionally
 - neutral: Like ~30% of relevant posts, comment ~15%, rarely follow
 - negative: Like ~10% of posts, comment ~5% (often critical), almost never follow
+
+## Tool Calling Rules
+- Always call browser_snapshot at the start of each step.
+- Use the snapshot to find real post IDs (e.g., #post-17).
+- Only click/type when a valid selector is visible; otherwise scroll or noop.
+- After any navigation or action that changes the page, call browser_snapshot again to confirm.
+- Never claim you clicked/typed without using a tool.
 
 ## SNS-Vibe Interface Guide
 The SNS uses these DOM elements:
@@ -157,9 +182,8 @@ The SNS uses these DOM elements:
 - Logout: #logout-button
 
 ## Important
-- Use Playwright MCP tools to interact with the page
-- First navigate to the SNS URL if not there
-- Use browser_snapshot to understand the current page state
+- Use Playwright MCP tools to interact with the page.
+- First navigate to the SNS URL if not there.
 - After each action, report what you did in a brief JSON format:
   {{"action": "<type>", "target": "<element>", "success": true/false, "reasoning": "<why>"}}
 """
@@ -171,6 +195,24 @@ def build_action_prompt(
     page_snapshot: str | None = None,
 ) -> str:
     """Build the action decision prompt for a step."""
+    recent_actions = []
+    recent_targets = []
+    for entry in state.actions_taken[-5:]:
+        action = (
+            entry.get("action_result", {}).get("action")
+            or entry.get("action")
+            or entry.get("response", {}).get("action")
+        )
+        target = (
+            entry.get("action_result", {}).get("target")
+            or entry.get("target")
+            or entry.get("response", {}).get("target")
+        )
+        if action:
+            recent_actions.append(action)
+        if target:
+            recent_targets.append(str(target))
+
     candidates_text = ""
     if post_candidates:
         for idx, post in enumerate(post_candidates[:5]):  # Limit to 5 posts
@@ -189,6 +231,9 @@ def build_action_prompt(
 - Step: {state.step_count}
 - Actions so far: {len(state.actions_taken)}
 - Logged in: {state.is_logged_in}
+- Recent actions: {", ".join(recent_actions) if recent_actions else "None"}
+- Recent targets: {", ".join(recent_targets) if recent_targets else "None"}
+- Session intent: {state.session_intent}
 
 Post context:{candidates_text}{snapshot_text}
 
@@ -197,6 +242,7 @@ Based on your persona ({state.persona.name}, {state.persona.reaction_bias} bias)
 1. First use browser_snapshot to see the current page
 2. Decide what action to take based on visible posts
 3. Execute the action using Playwright MCP tools
+4. Avoid repeating the same action or target you used very recently
 
 ## Available Actions
 - **like**: Click #like-button-{{post_id}} on a post you want to like
@@ -232,6 +278,7 @@ Your username: {state.username}
 2. Use browser_snapshot to see the page
 3. Fill the username input field (selector: input#username) with "{state.username}"
 4. Click the login button (selector: button[type="submit"])
+5. Use browser_snapshot again to confirm the feed is visible
 
 ## Expected Result
 After clicking login, you should be redirected to /feed with posts visible.
@@ -342,6 +389,7 @@ class MCPAgentRunner:
             actions_taken=[],
             is_logged_in=False,
             last_error=None,
+            session_intent=pick_session_intent(persona),
         )
 
         # Conversation history for context
@@ -369,7 +417,7 @@ class MCPAgentRunner:
         if not self.messages:
             self.messages.append({
                 "role": "system",
-                "content": build_system_prompt(self.persona, self.config),
+                "content": build_system_prompt(self.persona, self.config, self.state.session_intent),
             })
 
         self.messages.append({
@@ -428,6 +476,10 @@ class MCPAgentRunner:
             step_result["response"] = response_text[:1000]  # Truncate for logging
             step_result["action_result"] = action_result
             step_result["raw_output_length"] = len(json.dumps(response_raw))
+            step_result["llm"] = {
+                "raw_text": response_text,
+                "raw_response": response_raw,
+            }
 
             # Check if login succeeded
             if action_result.get("action") == "login" and action_result.get("success"):
