@@ -4,11 +4,11 @@ import { fileURLToPath, URL } from "node:url";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-function simulationIndexPlugin() {
+function simulationFilesPlugin() {
   return {
-    name: "simulation-index",
+    name: "simulation-files",
     configureServer(server: { middlewares: { use: Function } }) {
-      server.middlewares.use("/simulation/__index.json", async (_req: unknown, res: any) => {
+      server.middlewares.use("/simulation/__files.json", async (_req: unknown, res: any) => {
         try {
           const dir = path.resolve(fileURLToPath(new URL("./public/simulation", import.meta.url)));
           const entries = await fs.readdir(dir);
@@ -35,7 +35,7 @@ function simulationIndexPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), simulationIndexPlugin()],
+  plugins: [react(), simulationFilesPlugin()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url))

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { ActivityFeedIndex } from "@/types/activity";
 
@@ -12,12 +12,6 @@ export function useActivityFeedIndex(options: Options = {}) {
   const intervalMs = options.intervalMs ?? 5000;
   const [index, setIndex] = useState<ActivityFeedIndex | null>(null);
   const [status, setStatus] = useState<FeedIndexStatus>("loading");
-  const staticFiles = useMemo(() => {
-    const files = Object.keys(
-      import.meta.glob("/simulation/*.jsonl", { eager: true })
-    ).map(path => path.replace("/simulation/", ""));
-    return files;
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,14 +19,23 @@ export function useActivityFeedIndex(options: Options = {}) {
 
     const poll = async () => {
       try {
-        if (!staticFiles.length) {
-          throw new Error("No local feeds");
+        const response = await fetch(`/simulation/__files.json?t=${Date.now()}`, {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error(`Index ${response.status}`);
+        }
+
+        const data = (await response.json()) as ActivityFeedIndex;
+        if (!Array.isArray(data.files)) {
+          throw new Error("Invalid index");
         }
 
         if (!isMounted) return;
         setIndex({
-          updated_at: new Date().toISOString(),
-          files: staticFiles
+          updated_at: data.updated_at ?? new Date().toISOString(),
+          files: data.files
         });
         setStatus("ready");
       } catch {
@@ -48,7 +51,7 @@ export function useActivityFeedIndex(options: Options = {}) {
       isMounted = false;
       if (timerId) clearInterval(timerId);
     };
-  }, [intervalMs, staticFiles]);
+  }, [intervalMs]);
 
   return { index, status };
 }

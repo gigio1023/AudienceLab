@@ -69,21 +69,27 @@ cd sns-vibe
 npm install
 bash scripts/reset-db.sh
 npm run dev
+# 실행만 해두면 됩니다. 추가 액션은 필요 없습니다.
 
 # 3) Start Dashboard (Terminal 2)
 cd ../search-dashboard
 npm install
 npm run dev
+# 실행만 해두면 됩니다. 추가 액션은 필요 없습니다.
 
 # 4) Run Simulation (Terminal 3)
 cd ../agent
 uv sync
 uv run python local_agent.py
+# 실행 후 진행이 되도록 잠시 기다리면 됩니다.
+# 실시간 과정은 Start Dashboard에서 띄운 http://localhost:51730/ 에서
+# 멀티 에이전트 스웜 결과 + SNS 활동을 모니터링할 수 있습니다.
 
 # 5) (Optional) Deploy logs to dashboard feed
 python ../scripts/deploy_dashboard_data.py
 
 # 6) Run Evaluation
+# 시뮬레이션이 적당히 진행되면 Run Simulation 콘솔을 닫고 평가를 돌리세요.
 cd ../eval-agent
 uv sync
 uv run python evaluate.py

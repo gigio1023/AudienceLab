@@ -41,7 +41,7 @@ Eval Agent는 시뮬레이션 과정에서 생성된 여러 에이전트의 활�
 ```bash
 cd eval-agent
 cp .env.sample .env
-# OPENAI_API_KEY를 입력한 뒤 실행
+# OPENAI_API_KEY와 (선택) OPENAI_MAX_WORKERS를 설정한 뒤 실행
 uv sync
 uv run python evaluate.py
 ```

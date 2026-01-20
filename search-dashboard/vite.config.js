@@ -39,12 +39,12 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-function simulationIndexPlugin() {
+function simulationFilesPlugin() {
     return {
-        name: "simulation-index",
+        name: "simulation-files",
         configureServer: function (server) {
             var _this = this;
-            server.middlewares.use("/simulation/__index.json", function (_req, res) { return __awaiter(_this, void 0, void 0, function () {
+            server.middlewares.use("/simulation/__files.json", function (_req, res) { return __awaiter(_this, void 0, void 0, function () {
                 var dir, entries, files, error_1;
                 var _a;
                 return __generator(this, function (_b) {
@@ -78,7 +78,7 @@ function simulationIndexPlugin() {
     };
 }
 export default defineConfig({
-    plugins: [react(), simulationIndexPlugin()],
+    plugins: [react(), simulationFilesPlugin()],
     resolve: {
         alias: {
             "@": fileURLToPath(new URL("./src", import.meta.url))

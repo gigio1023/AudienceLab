@@ -1,6 +1,6 @@
 # Agent System - Local Playwright + OpenAI
 
-Multi-agent simulation system for social media engagement using local Playwright automation with OpenAI decision-making. This hybrid approach combines the efficiency of local browser automation with AI-powered decision logic, avoiding the need for publicly accessible MCP servers.
+Simple swarm-based simulation for social media engagement using local Playwright automation with OpenAI decision-making. The current entrypoint is `local_agent.py`, and logs are written for live dashboard monitoring and evaluation.
 
 ## Table of Contents
 
@@ -15,55 +15,19 @@ Multi-agent simulation system for social media engagement using local Playwright
 
 ## Architecture
 
-### Hybrid Agent Design
+### Simple Swarm Design
 
-The agent system uses a **local-first architecture** where:
+The agent system is **local-first**:
 
 1. **Playwright runs locally** - Browser automation executes on your machine
-2. **OpenAI makes decisions** - AI determines which actions to take based on page content and persona
-3. **No MCP server required** - Unlike traditional MCP implementations that need public URLs
-
-```
-┌──────────────────────┐
-│ Swarm Agent Runner   │
-└──────────┬───────────┘
-           │
-    ┌──────┴──────┐
-    │             │
-┌───▼──────┐  ┌───▼──────┐
-│ Headed  │  │ Headless │  (Same behavior, different UI visibility)
-│ Agents  │  │ Agents   │
-└───┬──────┘  └───┬──────┘
-    │             │
-┌───▼─────────────▼────┐
-│ LocalPlaywright Agent │  (Local browser automation)
-└────────┬─────────────┘
-         │
-    ┌────┴────┐
-    │         │
-┌───▼──────┐ │
-│Playwright│ │
-│ (Local)  │ │
-└──────────┘ │
-             │
-      ┌──────▼──────┐
-      │   OpenAI    │  (Decision making only)
-      │  API Call   │
-      └─────────────┘
-```
-
-### Key Components
+2. **OpenAI makes decisions** - AI determines actions based on page content and persona
+3. **Single entrypoint** - `local_agent.py` starts the swarm and writes logs for monitoring
 
 **LocalPlaywrightAgent** (`local_agent.py`)
 - Manages browser lifecycle and page navigation
 - Extracts visible page content for decision-making
 - Executes actions (like, comment, scroll, noop)
-- Logs all actions to JSONL files
-
-**Runner** (`runner.py`)
-- Orchestrates a swarm of agents (headed or headless)
-- Manages concurrency with semaphores
-- Aggregates results and metrics
+- Logs all actions to JSONL files (dashboard + evaluation input)
 
 **Personas**
 - Each agent has a unique persona with interests and behavior patterns
@@ -71,19 +35,11 @@ The agent system uses a **local-first architecture** where:
 
 ## Quick Start
 
-The fastest way to get started is using the total solution script:
-
 ```bash
 cd agent
-./run_all.sh --crowd-count 9 --max-concurrency 4
+uv sync
+uv run python local_agent.py
 ```
-
-This will:
-1. Check prerequisites (Node.js, Python, uv)
-2. Install dependencies if needed
-3. Start SNS-Vibe server on port 8383
-4. Run the agent simulation
-5. Clean up on exit
 
 ## Setup
 
@@ -117,12 +73,6 @@ cp .env.sample .env
 # Using uv (recommended)
 uv sync
 uv run playwright install chromium
-
-# Or using pip
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
 ```
 
 #### 3. Configure Environment
@@ -157,7 +107,7 @@ npm run dev -- --port 8383
 
 ```bash
 cd ../agent
-uv run python cli.py run --crowd-count 9 --max-concurrency 4
+uv run python local_agent.py
 ```
 
 ## Configuration
@@ -193,34 +143,6 @@ This is handled automatically in `local_agent.py:_get_decision()`.
 
 ## Usage
 
-### Using run_all.sh (Recommended)
-
-```bash
-# Basic usage - 9 swarm agents, max 4 concurrent
-./run_all.sh
-
-# Custom configuration
-./run_all.sh --crowd-count 20 --max-concurrency 8
-
-# Show browser windows (headed mode)
-./run_all.sh --headed
-
-# Dry-run mode (skip actual actions)
-./run_all.sh --dry-run
-
-# Combined options
-./run_all.sh --crowd-count 15 --max-concurrency 6 --headed
-```
-
-**Options:**
-- `--crowd-count N` - Number of swarm agents (default: 9)
-- `--max-concurrency N` - Max concurrent agents (default: 4)
-- `--headed` - Show browser windows
-- `--dry-run` - Skip actual browser actions
-- `--help` - Show help message
-
-### Using CLI Directly
-
 Make sure SNS-Vibe is running first:
 
 ```bash
@@ -230,63 +152,26 @@ npm run dev -- --port 8383
 
 # In terminal 2
 cd agent
-source .venv/bin/activate
-
-# Run simulation
-python cli.py run --goal "Engagement simulation" --crowd-count 9
+uv run python local_agent.py
 ```
 
-**CLI Options:**
-- `--goal TEXT` - Simulation goal description
-- `--crowd-count N` - Number of swarm agents (default: 8)
-- `--max-concurrency N` - Max concurrent agents (default: 4)
-- `--dry-run` - Skip OpenAI calls and actual actions
-- `--no-hero` - Disable the optional headed agent (legacy flag name)
-- `--headed` - Show browser windows
-- `--no-screenshots` - Disable screenshots
-- `--persona-file PATH` - Custom personas JSON file
-- `--post-context TEXT` - Override post context
-
-### Single Agent (for Testing)
-
-```bash
-uv run python single_agent.py --mcp --headed
-```
-
-### Smoke Test
-
-Quick validation of the system:
-
-```bash
-uv run python cli.py smoke-test --verbose
-```
+**Options:**
+- `--num-agents N` - Number of swarm agents (default: 3)
+- `--max-steps N` - Maximum steps per agent (default: 10)
+- `--all-headed` - Show all browser windows
+- `--all-headless` - Run all agents headless
+- `--screenshots` - Save screenshots during execution
 
 ## Outputs
 
-All simulation outputs are stored in `agent/outputs/{runId}/`:
+Agent action logs are written as JSONL for live monitoring in the dashboard and for evaluation:
 
-### Directory Structure
-
-```
-outputs/
-└── {runId}/
-    ├── hero/  (legacy label; all agents share the same behavior)
-    │   ├── actions.jsonl
-    │   ├── 001_navigate.json
-    │   ├── 002_login.json
-    │   └── ...
-    ├── local-crowd-001/  (legacy label; all agents share the same behavior)
-    │   ├── actions.jsonl
-    │   └── ...
-    ├── local-crowd-002/
-    │   ├── actions.jsonl
-    │   └── ...
-    └── ...
-```
+- **Dashboard logs**: `search-dashboard/public/simulation/*.jsonl` (default output dir)
+- **Evaluation**: run `eval-agent/` after the swarm finishes to assess results
 
 ### JSONL Action Log Format
 
-Each `actions.jsonl` contains one JSON object per line:
+Each agent log file (`{agentId}__{personaId}.jsonl`) contains one JSON object per line:
 
 ```json
 {
@@ -307,26 +192,6 @@ Each `actions.jsonl` contains one JSON object per line:
   }
 }
 ```
-
-### Simulation State
-
-Global simulation state is saved to `shared/simulation/{simulationId}.json`:
-
-```json
-{
-  "simulationId": "uuid",
-  "status": "completed",
-  "totalAgents": 10,
-  "completedAgents": 10,
-  "engagement": 45,
-  "runId": "timestamp-based-id"
-}
-```
-
-### Schema Documentation
-
-- Action log schema: `agent/outputs/action-schema.json`
-- Simulation schema: `shared/simulation-schema.json`
 
 ## Troubleshooting
 
@@ -380,9 +245,8 @@ uv run playwright install chromium
 **Problem**: System slows down or crashes with many agents.
 
 **Solutions**:
-- Reduce `--max-concurrency`: `./run_all.sh --max-concurrency 2`
-- Reduce `--crowd-count`: `./run_all.sh --crowd-count 5`
-- Use headless mode (default) instead of `--headed`
+- Reduce `--num-agents`: `uv run python local_agent.py --num-agents 2`
+- Use headless mode (default) instead of `--all-headed`
 
 ### Debug Mode
 
@@ -393,20 +257,17 @@ Enable verbose logging:
 AGENT_LOG_LEVEL=DEBUG
 
 # Or use environment variable
-AGENT_LOG_LEVEL=DEBUG uv run python cli.py run --crowd-count 9
+AGENT_LOG_LEVEL=DEBUG uv run python local_agent.py
 ```
 
 ### Viewing Logs
 
 ```bash
-# Watch SNS-Vibe logs
-tail -f /tmp/sns-vibe.log
-
 # View agent action logs
-tail -f agent/outputs/{runId}/local-crowd-001/actions.jsonl
+tail -f search-dashboard/public/simulation/*.jsonl
 
 # Pretty-print JSONL
-cat agent/outputs/{runId}/local-crowd-001/actions.jsonl | jq
+cat search-dashboard/public/simulation/*.jsonl | jq
 ```
 
 ## Development
@@ -445,14 +306,14 @@ Create a JSON file with persona definitions:
 ]
 ```
 
-Use with `--persona-file`:
+Update `sns-vibe/seeds/personas.json` (used by `local_agent.py`) to include your custom personas:
 ```bash
-uv run python cli.py run --persona-file custom_personas.json
+cp custom_personas.json ../sns-vibe/seeds/personas.json
 ```
 
-### Extending the Runner
+### Extending the Swarm
 
-See `runner.py:run_mcp_agents()` for the main orchestration logic. Key extension points:
+See `local_agent.py:run_local_agents_parallel()` for the orchestration logic. Key extension points:
 
 - **Pre-run hooks**: Add setup logic before agent execution
 - **Post-run hooks**: Add cleanup or aggregation logic
@@ -462,14 +323,8 @@ See `runner.py:run_mcp_agents()` for the main orchestration logic. Key extension
 ### Testing Changes
 
 ```bash
-# Test with single agent
-uv run python single_agent.py --mcp --headed
-
 # Test with small swarm
-./run_all.sh --crowd-count 2 --max-concurrency 1 --headed
-
-# Dry-run mode (no actual actions)
-./run_all.sh --dry-run --crowd-count 5
+uv run python local_agent.py --num-agents 2 --max-steps 5
 ```
 
 ### Code Structure
@@ -478,49 +333,13 @@ uv run python single_agent.py --mcp --headed
 agent/
 ├── local_agent.py       # Core local Playwright agent
 ├── runner.py            # Multi-agent orchestration
-├── cli.py               # Command-line interface
-├── single_agent.py      # Single agent runner (legacy)
+├── cli.py               # Legacy command-line interface
+├── single_agent.py      # Legacy single-agent runner
 ├── accounts.py          # Account management
-├── run_all.sh           # Total solution script
+├── run_all.sh           # Legacy total solution script
 ├── .env                 # Configuration
 ├── personas.json        # Default personas
-└── outputs/             # Simulation outputs
-```
-
-## Advanced Topics
-
-### Budget Tracking
-
-The system tracks OpenAI API costs per agent. See `runner.py` for budget management.
-
-### Concurrency Control
-
-Agent concurrency is managed with `asyncio.Semaphore`:
-
-```python
-semaphore = asyncio.Semaphore(max_concurrency)
-async with semaphore:
-    await agent.run_loop(max_steps, max_time_seconds)
-```
-
-### Action Biases
-
-Personas have action biases that influence behavior:
-
-- **positive**: Prefers liking and positive comments
-- **neutral**: Balanced mix of actions
-- **negative**: More critical engagement
-
-See `local_agent.py:Persona` dataclass.
-
-### Evaluation
-
-Compare simulation results with expected outcomes:
-
-```bash
-uv run python cli.py evaluate \
-  --expected ../shared/evaluation/expected.example.json \
-  --run-id {runId}
+└── output/              # Local artifacts (optional)
 ```
 
 ## Account Management
@@ -537,9 +356,8 @@ Default seed accounts are documented in `agent/ACCOUNTS.md`. Override with `SNS_
 
 For issues or questions:
 1. Check [Troubleshooting](#troubleshooting) section
-2. Review logs in `agent/outputs/` and `/tmp/sns-vibe.log`
+2. Review logs in `search-dashboard/public/simulation/`
 3. Enable debug mode with `AGENT_LOG_LEVEL=DEBUG`
-4. Test with `--dry-run` to isolate issues
 
 ## License
 

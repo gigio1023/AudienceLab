@@ -431,6 +431,7 @@ def start_playwright_mcp() -> subprocess.Popen[str] | None:
         return None
 
     os.environ["PLAYWRIGHT_MCP_URL"] = env["PLAYWRIGHT_MCP_URL"]
+    logger.info("Playwright MCP command: {}", " ".join(cmd))
     logger.info("Playwright MCP server started at {}", env["PLAYWRIGHT_MCP_URL"])
     return proc
 
@@ -807,6 +808,12 @@ class LocalPlaywrightAgent:
             # Extract current page content
             page_content = await extract_page_content(self.page) if self.page else ""
             self.state.page_content = page_content
+            logger.info(
+                "Agent {} step {}: extracted {} chars of page content",
+                self.state.agent_id,
+                self.state.step_count,
+                len(page_content),
+            )
 
             # Get decision from model
             decision, raw_text, raw_response = await self._get_decision(page_content)
@@ -816,6 +823,14 @@ class LocalPlaywrightAgent:
                 "comment_text": decision.comment_text,
                 "reasoning": decision.reasoning,
             }
+            logger.info(
+                "Agent {} step {}: decision action={} target={} reason={}",
+                self.state.agent_id,
+                self.state.step_count,
+                decision.action,
+                decision.target,
+                (decision.reasoning or "")[:120],
+            )
             step_result["llm"] = {
                 "raw_text": raw_text,
                 "raw_response": raw_response,
@@ -824,6 +839,14 @@ class LocalPlaywrightAgent:
             # Execute the action
             action_result = await self._execute_action(decision)
             step_result["result"] = action_result
+            logger.info(
+                "Agent {} step {}: result action={} success={} error={}",
+                self.state.agent_id,
+                self.state.step_count,
+                action_result.get("action"),
+                action_result.get("success"),
+                action_result.get("error"),
+            )
 
             # Take screenshot after action
             if action_result.get("success"):
@@ -1109,16 +1132,21 @@ if __name__ == "__main__":
         args.num_agents, args.max_steps, headless,
     )
 
-    results, metrics = asyncio.run(
-        run_local_agents_parallel(
-            personas=personas,
-            agent_count=args.num_agents,
-            max_concurrency=min(4, args.num_agents),
-            max_steps_per_agent=args.max_steps,
-            headless=headless,
-            save_screenshots=args.screenshots,
+    try:
+        results, metrics = asyncio.run(
+            run_local_agents_parallel(
+                personas=personas,
+                agent_count=args.num_agents,
+                max_concurrency=min(4, args.num_agents),
+                max_steps_per_agent=args.max_steps,
+                headless=headless,
+                save_screenshots=args.screenshots,
+            )
         )
-    )
+    except KeyboardInterrupt:
+        logger.warning("Interrupted by user, shutting down...")
+        _shutdown()
+        raise SystemExit(130)
 
     print("\n=== Results ===")
     print(json.dumps(results, indent=2))

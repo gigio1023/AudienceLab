@@ -159,9 +159,7 @@ export default function App() {
       return persona ? { agentId: agent.id, persona } : null;
     })
     .filter((entry): entry is { agentId: string; persona: PersonaSeed } => Boolean(entry));
-  const uniquePersonas = Array.from(
-    new Map(agentPersonaPairs.map(entry => [entry.persona.username, entry.persona])).values()
-  );
+  const sampledPersonas = personaSeeds.slice(-3);
   const latestPersona = latestActivity?.agent_id ? agentPersonaById.get(latestActivity.agent_id) ?? null : null;
   const postContext = simulation?.config.parameters?.postContext ?? "";
   const handleMatch = postContext.match(/@([a-zA-Z0-9._-]+)/);
@@ -347,33 +345,29 @@ export default function App() {
         <section className="persona-section">
           <div className="section-header">
             <h2>User personas</h2>
-            <p>Definitions referenced by live agents (matched by username).</p>
+            <p>Sampled personas from the seed list.</p>
           </div>
           <div className="persona-grid">
-            {uniquePersonas.length ? (
-              uniquePersonas.map(persona => (
-                <div key={persona.username} className="persona-card">
-                  <div className="persona-header">
-                    <div>
-                      <strong>{persona.username}</strong>
-                      <span className="persona-id">{persona.occupation}</span>
-                    </div>
-                    <span className="persona-tone">{persona.communication_style}</span>
+            {sampledPersonas.map(persona => (
+              <div key={persona.username} className="persona-card">
+                <div className="persona-header">
+                  <div>
+                    <strong>{persona.username}</strong>
+                    <span className="persona-id">{persona.occupation}</span>
                   </div>
-                  <p className="persona-description">
-                    {persona.age_range} · {persona.location} · {persona.engagement_level} engagement
-                  </p>
-                  <p className="persona-description">
-                    Traits: {persona.personality_traits.slice(0, 3).join(", ")}
-                  </p>
-                  <p className="persona-description">
-                    Interests: {persona.interests.slice(0, 3).join(", ")}
-                  </p>
+                  <span className="persona-tone">{persona.communication_style}</span>
                 </div>
-              ))
-            ) : (
-              <div className="empty-card">No persona usernames matched in agent IDs yet.</div>
-            )}
+                <p className="persona-description">
+                  {persona.age_range} · {persona.location} · {persona.engagement_level} engagement
+                </p>
+                <p className="persona-description">
+                  Traits: {persona.personality_traits.slice(0, 3).join(", ")}
+                </p>
+                <p className="persona-description">
+                  Interests: {persona.interests.slice(0, 3).join(", ")}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
       </main>

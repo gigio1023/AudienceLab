@@ -1,5 +1,6 @@
 import os
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ marketing_post_ids = set()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", None)
+OPENAI_MAX_WORKERS = int(os.getenv("OPENAI_MAX_WORKERS", "16"))
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is required to run the evaluator.")
@@ -191,20 +193,32 @@ def main():
         print(f"\n=== LLM Judge Evaluation ({len(comments)} comments) ===")
         print("Running LLM evaluation (this may take a moment)...")
         
-        for idx, row in comments.iterrows():
-            res = evaluate_comment(row['reasoning'], row['comment_text'])
-            if res:
-                judge_results.append({
-                    "agent_id": row['agent_id'],
-                    "step": row['step'],
-                    "comment": row['comment_text'],
-                    "reasoning": row['reasoning'],
-                    "relevance": res.relevance_score,
-                    "tone": res.tone_score,
-                    "consistency": res.consistency_score,
-                    "explanation": res.explanation
-                })
-                print(f"[{row['agent_id']}]: R={res.relevance_score} T={res.tone_score} C={res.consistency_score}")
+        comment_rows = list(comments.to_dict(orient="records"))
+        worker_count = max(1, min(OPENAI_MAX_WORKERS, len(comment_rows)))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {
+                executor.submit(
+                    evaluate_comment,
+                    row["reasoning"],
+                    row["comment_text"],
+                ): row
+                for row in comment_rows
+            }
+            for future in as_completed(futures):
+                row = futures[future]
+                res = future.result()
+                if res:
+                    judge_results.append({
+                        "agent_id": row["agent_id"],
+                        "step": row["step"],
+                        "comment": row["comment_text"],
+                        "reasoning": row["reasoning"],
+                        "relevance": res.relevance_score,
+                        "tone": res.tone_score,
+                        "consistency": res.consistency_score,
+                        "explanation": res.explanation
+                    })
+                    print(f"[{row['agent_id']}]: R={res.relevance_score} T={res.tone_score} C={res.consistency_score}")
     else:
         print("\nNo successful marketing comments found to evaluate.")
 
