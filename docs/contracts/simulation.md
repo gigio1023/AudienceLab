@@ -1,107 +1,136 @@
-# Simulation Integration Protocol
+# Simulation Integration Protocol (File Feed)
 
-본 문서는 **Simulation Engine (Agent)**과 **Command Center (Dashboard)** 간의 데이터 교환 규약(Interface Contract)을 정의한다. 두 시스템은 직접적인 동기 통신을 최소화하고, **File-based State Replication** 패턴을 통해 느슨하게 결합(Loosely Coupled)된다.
+본 문서는 **Simulation Agent**가 생성하는 JSON/JSONL 파일을 **Dashboard**가 지속적으로 읽어 시각화하는 파일 기반 연동 규약을 정의한다. 대시보드는 시뮬레이션을 시작하지 않고, 결과 파일을 관찰하며 상태를 갱신한다.
 
 ## 1. Protocol Architecture
 
 ### 1.1 Communication Channel
-*   **Method**: Asynchronous File Polling
-*   **Shared Resource**: `shared/simulation/{simulationId}.json`
-*   **Access Pattern**:
-    *   **Writer**: Simulation Runner (Agent Process) - *Single Writer Principle*
-    *   **Reader**: Dashboard Client (React App) - *Multi Reader*
+* **Method**: Asynchronous File Polling
+* **Writer**: Simulation Runner (Agent Process)
+* **Reader**: Dashboard Client (React)
 
-### 1.2 Lifecycle States
-시뮬레이션 객체는 정의된 상태 머신(Finite State Machine)에 따라 전이된다.
+### 1.2 File Location
+대시보드는 Vite `public/` 경로를 통해 파일을 읽는다.
+```
+search-dashboard/public/simulation/{simulationId}.json
+search-dashboard/public/simulation/{agent-file}.jsonl
+search-dashboard/public/simulation/index.json
+```
 
-| State | Enum Value | Description | Transition Trigger |
-|-------|------------|-------------|-------------------|
-| **Initialized** | `pending` | 설정이 생성되었으나 리소스 할당 전. | API Request Accepted |
-| **Active** | `running` | 에이전트 프로세스가 구동 중. | Runner Process Spawned |
-| **Finalized** | `completed` | 정상 종료 및 결과 집계 완료. | All Agents Finished |
-| **Aborted** | `failed` | 런타임 에러 또는 타임아웃. | Uncaught Exception |
+> 에이전트가 `shared/simulation/`에 쓰는 경우, `public/simulation`에 심볼릭 링크를 연결한다.
 
 ---
 
-## 2. Interface Schema (JSON)
+## 2. Lifecycle States
+`status` 필드는 시뮬레이션 자체의 상태를 나타낸다.
 
-모든 데이터 교환은 아래 정의된 JSON Schema를 엄격히 준수해야 한다.
-> **Source of Truth**: [`shared/simulation-schema.json`](../../shared/simulation-schema.json)
+| State | Enum Value | Description |
+|-------|------------|-------------|
+| Initialized | `pending` | 설정 생성 후 실행 전 |
+| Active | `running` | 에이전트 실행 중 |
+| Finalized | `completed` | 정상 종료 |
+| Aborted | `failed` | 비정상 종료 |
 
-### 2.1 Header (Meta Information)
-모든 상태 파일에 공통적으로 포함되는 메타데이터.
+Dashboard는 별도로 **Feed 상태**(`loading/ready/error`)를 관리한다.
 
-```typescript
-interface SimulationHeader {
-  simulationId: string;    // UUID v4 format
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress: number;        // Integer 0-100
-  createdAt: string;       // ISO 8601 UTC
-  updatedAt: string;       // ISO 8601 UTC
-}
-```
+---
 
-### 2.2 Configuration Context
-시뮬레이션 실행을 위한 입력 파라미터 불변 객체.
+## 3. Interface Schema (JSON)
 
-```typescript
-interface SimulationConfig {
-  goal: string;            // Natural language validation required (min 10 chars)
-  budget: number;          // USD value
-  duration: number;        // Days
-  targetPersona: string;   // Template ID reference
-  parameters: {            // Optional advanced params
-    agentCount?: number;
-    messageTone?: string;
-  };
-}
-```
-
-### 2.3 Result Payload (Available only in `completed` state)
-최종 의사결정을 위한 정량/정성 데이터 집계.
-
+### 3.1 Types (TypeScript)
 ```typescript
 interface SimulationResult {
-  metrics: {
-    reach: number;         // Total impressions
-    engagement: number;    // Likes + Comments + Shares
-    conversionEstimate: number;
-    roas: number;
+  simulationId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;          // 0-100
+  createdAt: string;         // ISO 8601
+  config: {
+    post_description: string;
+    agent_count: number;
   };
-  confidenceLevel: 'low' | 'medium' | 'high'; // Based on data tier
-  agentLogs: AgentLog[];   // Time-series action logs
-  personaTraces: Trace[];  // Representative user journeys
+  agents: AgentResult[];
+  metrics: {
+    total_agents: number;
+    reactions: {
+      positive: number;
+      neutral: number;
+      negative: number;
+    };
+    actions: {
+      like: number;
+      comment: number;
+      skip: number;
+    };
+    positive_rate: number;   // 0-1
+    engagement_rate: number; // 0-1
+    sentiment_score: number; // 0-1
+  };
+  stigmergy_trace: string[];
+}
+
+interface AgentResult {
+  persona_id: string;
+  persona_name: string;
+  reaction: 'positive' | 'neutral' | 'negative';
+  action: 'like' | 'comment' | 'skip';
+  comment_text: string | null;
+  internal_thought: string;
+  reasoning: string;
 }
 ```
 
 ---
 
-## 3. Integration Workflow
+## 4. Agent Activity Feed (JSONL)
 
-시스템 간 상호작용의 시퀀스 다이어그램.
+각 에이전트는 **JSONL** 파일에 활동 로그를 append 한다. (한 줄 = 하나의 이벤트)
 
-1.  **Request (Dashboard -> Bridge)**
-    *   `POST /api/simulation/start`
-    *   Bridge는 즉시 `simulationId` 생성 및 `pending` 상태 파일 작성 후 202 응답.
+### 4.1 Recommended Fields (Loose)
+```
+{
+  "id": "evt_...",
+  "agent_id": "agent_03",
+  "action": "comment",
+  "timestamp": "2025-10-03T14:44:12Z",
+  "content": "Love the tone.",
+  "target": "post_001",
+  "metadata": {
+    "platform": "pixelfed",
+    "screen": "feed"
+  }
+}
+```
 
-2.  **Execution (Bridge -> Runner)**
-    *   Bridge는 `main_runner.py`를 서브프로세스로 스폰(Spawn).
-    *   Runner는 시작 시 상태를 `running`으로 업데이트.
-
-3.  **Monitoring (Dashboard -> File System)**
-    *   Dashboard는 `2000ms` 간격으로 JSON 파일 폴링.
-    *   `progress` 필드를 UI 프로그레스 바에 바인딩.
-
-4.  **Completion (Runner -> File System)**
-    *   Runner는 집계 완료 후 `result` 객체를 포함하여 `completed` 상태로 원자적(Atomic) 쓰기 수행.
-    *   Dashboard는 `completed` 감지 시 폴링 중단 및 리포트 렌더링.
+### 4.2 Normalization
+Dashboard는 `search-dashboard/src/lib/activityInterface.ts`에서 필드명을 정규화한다. 스펙 확정 전까지는 `action | event | type` 등 여러 키를 허용한다.
 
 ---
 
-## 4. Error Handling Standards
+## 5. Feed Index (Optional)
 
-### 4.1 Runner Failures
-Runner 프로세스가 비정상 종료된 경우, Bridge 서버 또는 별도의 Watchdog이 이를 감지하여 상태 파일을 `failed`로 업데이트해야 한다.
+대시보드가 에이전트 파일 목록을 자동으로 갱신하기 위해 `index.json`을 사용한다.
+```
+{
+  "updated_at": "2025-10-03T00:00:00Z",
+  "files": ["agent-01.jsonl", "agent-02.jsonl"]
+}
+```
 
-### 4.2 Schema Validation
-Reader(Dashboard)는 JSON 파일을 읽을 때 필수 필드 누락 여부를 검증해야 한다. 스키마 불일치 시 `Corrupted Data` 에러로 처리하고 사용자에게 알린다.
+`index.json`이 없으면 `VITE_AGENT_FEEDS` 값을 사용한다.
+
+---
+
+## 6. Writer Requirements
+
+1. **Atomic Write**: 임시 파일로 쓰고 rename하여 부분 쓰기 방지.
+2. **Monotonic Progress**: `progress` 값은 되도록 감소하지 않게 유지.
+3. **Consistent Arrays**: `agents`, `stigmergy_trace`는 누적형으로 append.
+4. **JSONL Append**: 에이전트 파일은 한 줄씩 append 한다.
+
+---
+
+## 7. Reader Behavior (Dashboard)
+
+1. `2000ms` 간격으로 `/simulation/{id}.json` 및 `/simulation/{agent-file}.jsonl` 폴링
+2. 정상 수신 시 UI 갱신
+3. 실패 시 Mock 데이터로 유지하고 상태 배지에 `Feed error` 표시

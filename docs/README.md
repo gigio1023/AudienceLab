@@ -2,6 +2,10 @@
 
 > **One-line Summary**: Real Instagram engagement 데이터를 Ground Truth로 사용하여, Private SNS 환경에서 Multi-Agent 시뮬레이션을 수행하고 인플루언서 캠페인 성과를 예측하는 Local-first Orchestrator System.
 
+## Agent Skills Guide
+
+Agent Skills 운영 가이드는 `docs/AGENT_SKILLS.md`를 참고하십시오.
+
 본 문서는 프로젝트의 목표, 핵심 가치, 시스템 범위 및 기술적 요구사항을 정의하는 최상위 명세서(Project Requirement Document)이다.
 
 ## 1. Product Story & Core Flow
@@ -65,7 +69,7 @@
     *   VLM(Vision-Language Model) 기반의 자율 브라우저 에이전트.
     *   Playwright를 사용하여 실제 사람처럼 보고(Vision), 판단하고(LLM), 행동(Action)한다.
 *   **`search-dashboard/` (Control Plane)**:
-    *   React 기반의 시뮬레이션 설정 및 결과 분석 UI.
+    *   React 기반의 시뮬레이션 설정 및 결과 분석 UI (검색은 사전 완료 가정).
     *   Mock Data와 실제 시뮬레이션 결과를 하이브리드로 처리한다.
 *   **`shared/` (Interface Protocol)**:
     *   컴포넌트 간 데이터 교환을 위한 JSON Schema 및 파일 기반 IPC 규약.

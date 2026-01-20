@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  --bg-base: #f6f7f8;
+  --bg-deep: #eef1f4;
+  --bg-card: #ffffff;
+  --bg-card-strong: #f2f4f6;
+  --text-primary: #151a22;
+  --text-muted: #4f5966;
+  --text-dim: #7a8694;
+  --accent-mint: #4b7a72;
+  --accent-amber: #ad8a57;
+  --accent-rose: #9a6d66;
+  --accent-ice: #6d85a3;
+  --border-subtle: rgba(15, 23, 42, 0.12);
+  --shadow-strong: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "Space Grotesk", system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+p {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 999px;
+}

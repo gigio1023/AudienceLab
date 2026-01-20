@@ -6,11 +6,11 @@
 
 ## 프로젝트 개요
 
-로컬 우선 다중 에이전트 오케스트레이터로, 실제 Instagram 참여 데이터를 기준으로 인플루언서 캠페인을 시뮬레이션하고, 결과를 검색 + 시뮬레이션 대시보드에 표시합니다.
+로컬 우선 다중 에이전트 오케스트레이터로, 실제 Instagram 참여 데이터를 기준으로 인플루언서 캠페인을 시뮬레이션하고, 결과를 시뮬레이션 + 보고 대시보드에 표시합니다.
 
 ### 데모할 기능 (Product Story)
-1. 회사가 원하는 결과를 자연어로 설명 (목표, 타겟, 지역, 톤, 예산).
-2. 시스템이 적합한 인플루언서를 추천하고 적합성 이유를 설명.
+1. 회사의 목표/타겟/톤이 이미 반영된 사전 선별 리스트를 준비.
+2. 시스템이 후보 인플루언서의 적합성 이유를 설명.
 3. 각 후보 인플루언서에 대해 로컬 SNS에서 팔로워 행동 시뮬레이션 실행.
 4. 참여 기반 프록시 메트릭(좋아요/댓글/팔로우)으로 후보를 점수화하고 대표 페르소나 추적 표시.
 
@@ -27,7 +27,7 @@
 |-----------|------|------------|
 | `sns/` | 로컬 SNS 플랫폼 (시뮬레이션 스테이지) | Pixelfed, Docker, MySQL, Redis |
 | `agent/` | 페르소나 기반 브라우저 에이전트 | Python, Playwright, OpenAI Computer Use API |
-| `search-dashboard/` | 검색 + 시뮬레이션 UI | React, TypeScript, Vite |
+| `search-dashboard/` | 시뮬레이션 + 보고 UI (검색은 사전 완료 가정) | React, TypeScript, Vite |
 | `insta-crawler/` | Instagram 크롤러 + 데이터셋 도구 | Python, Playwright, SQLite |
 | `shared/` | 파일 기반 교환 (스키마, 시뮬레이션 결과) | JSON Schema |
 | `context/` | 연구 노트 (참조 전용) | Markdown |
@@ -41,6 +41,16 @@
 ### 시뮬레이션 출력 (에이전트 → 대시보드)
 - `agent/`는 `shared/simulation/{simulationId}.json`에 `shared/simulation-schema.json`을 따르는 파일을 작성합니다.
 - 대시보드는 공유 폴더를 폴링하여 시뮬레이션 출력을 읽습니다 (`shared/README.md` 참조).
+
+### 에이전트 활동 로그 (JSONL)
+- 에이전트별 JSONL 로그를 `search-dashboard/public/simulation/*.jsonl`에 append 합니다.
+- `index.json`이 존재하면 대시보드는 해당 파일 목록을 기준으로 폴링합니다.
+- 스펙은 `docs/contracts/simulation.md`와 `docs/components/dashboard.md`를 참조합니다.
+
+## Agent Skills
+
+프로젝트 내 Agent Skills 가이드는 `docs/AGENT_SKILLS.md`에 정리되어 있습니다.
+- JSONL 활동 로그를 위한 스킬: `.codex/skills/jsonl-activity-feed/`
 
 ## Instagram 데이터 요구사항
 
@@ -79,7 +89,7 @@ Comment (Tier 2+): comment_id, shortcode, owner_username, created_at, text, fetc
 4. 회사 쿼리의 경우, 후보 인플루언서를 선택하고 캠페인 시뮬레이션 구성.
 5. 페르소나 기반 팔로워 에이전트(`agent/`)를 실행하여 Pixelfed에서 반응 시뮬레이션.
 6. 로그 및 메트릭 집계, 과거 참여 데이터와 비교 (Tier 1+).
-7. 대시보드(`search-dashboard/`)에서 검색, 시뮬레이션, 보고 흐름 표시.
+7. 대시보드(`search-dashboard/`)에서 사전 선별된 리스트로 시뮬레이션 및 보고 흐름 표시.
 
 ---
 
@@ -219,7 +229,7 @@ docker exec pixelfed-app php artisan <command>
 
 ### Search Dashboard (`search-dashboard/`)
 
-자연어/관심사 쿼리에서 관련 인플루언서를 찾고 가상 인플루언서 마케팅 시뮬레이션을 실행하여 캠페인 성과를 추정하는 검색 + 시뮬레이션 대시보드 프론트엔드를 구축합니다.
+사전 선별된 인플루언서 리스트를 가정하고 바로 시뮬레이션을 실행해 캠페인 성과를 추정하는 시뮬레이션 + 보고 대시보드 프론트엔드를 구축합니다. 검색 UI는 범위 밖이며, 결과가 이미 준비된 상태에서 시작합니다.
 
 #### 기술 스택 (구현됨)
 
@@ -246,18 +256,15 @@ src/components/animations/
 
 #### 이 디렉토리의 범위
 
-- 검색 경험 (자연어 + 태그)
-- 인플루언서 발견 및 비교
+- 사전 로드된 숏리스트 표시 및 비교
 - 시뮬레이션 구성 및 실행 UI
 - 결과/보고 뷰
 - 시스템 상태 및 데이터 신선도 패널
 
 #### 핵심 기능 (MVP)
 
-**검색 및 추천**
-- 자연어 쿼리 입력 + 태그 칩
-- 필터: 플랫폼, 카테고리, 지역, 팔로워 범위, 가격 범위
-- 정렬: 관련성, 참여도, 도달범위, 예상 전환
+**숏리스트(사전 로드)**
+- 입력 없이 바로 시작하는 후보 인플루언서 카드
 - 빠른 작업(저장, 비교, 시뮬레이션)이 포함된 결과 목록
 
 **인플루언서 상세**
@@ -346,7 +353,6 @@ box-shadow: 0 20px 50px rgba(27, 31, 29, 0.12);
 
 #### 통합 지점 (가정된 API)
 
-- `POST /api/search` -> `{ results, explanation }`
 - `GET /api/influencers/:id` -> `{ influencer, history, audience }`
 - `POST /api/simulations` -> `{ job_id }`
 - `GET /api/simulations/:job_id` -> `{ status, progress, result? }`
@@ -356,14 +362,13 @@ box-shadow: 0 20px 50px rgba(27, 31, 29, 0.12);
 
 - 밀도 높은 데이터 화면을 위한 명확한 정보 계층
 - 모든 비동기 패널에 로딩/빈/오류 상태
-- 캐싱으로 첫 번째 검색 결과 ~3초 이내
-- 핵심 뷰(검색/결과/보고)의 모바일 안전 레이아웃
+- 핵심 뷰(숏리스트/결과/보고)의 모바일 안전 레이아웃
 - 시뮬레이션된 메트릭의 불확실성/신뢰도 표시
 - 애니메이션은 데이터 이해를 방해하지 않도록 향상
 
 #### 성공 기준
 
-- 종단 간 흐름: 검색 -> 선택 -> 시뮬레이션 -> 보고
+- 종단 간 흐름: 사전 선별 -> 시뮬레이션 -> 보고
 - 현실적인 데이터 밀도와 명확한 비교가 있는 안정적인 UI
 - 백엔드 엔드포인트가 확정되면 쉽게 확장 가능
 - 해커톤 데모에서 "역동적이고 기능적인" 인상을 만드는 애니메이션
@@ -449,8 +454,7 @@ Instagram에서 인플루언서/팔로워 데이터를 수집하는 크롤러와
 
 ## 개발 가이드라인
 
-- **서브모듈 확인 (중요)**: 작업을 시작하기 전에 git 서브모듈이 초기화되었는지 확인하십시오. `search-dashboard/react-bits` 또는 `search-dashboard/shadcn-ui`가 비어 있으면 `git submodule update --init --recursive`를 실행합니다.
-- **서브모듈 일괄 업데이트**: 모든 서브모듈을 최신 상태로 맞추려면 `git submodule sync --recursive && git submodule update --init --recursive --remote`를 실행합니다.
+- **벤더 디렉토리 확인 (중요)**: 작업을 시작하기 전에 `search-dashboard/vendor/react-bits`와 `search-dashboard/vendor/shadcn-ui`가 존재하는지 확인하십시오. 없으면 해당 레포를 clone하여 참조합니다.
 - 컴포넌트별 기존 스택 및 도구를 따르십시오(README, package.json, pyproject, docker-compose 확인).
 - 변경 사항을 작고 집중적으로 유지합니다; 필요한 경우가 아니면 컴포넌트 간 결합을 피합니다.
 - 컴포넌트 간 명시적인 데이터 계약으로 타이핑된 인터페이스를 선호합니다.
@@ -462,7 +466,7 @@ Instagram에서 인플루언서/팔로워 데이터를 수집하는 크롤러와
 
 - 로컬 SNS가 실행 중이고 접근 가능합니다.
 - 에이전트가 인증하고 현실적인 작업을 수행할 수 있습니다.
-- 대시보드가 `shared/simulation/*.json`을 사용하여 검색 → 시뮬레이션 → 보고 흐름을 종단 간으로 보여줍니다.
+- 대시보드가 `shared/simulation/*.json`을 사용하여 사전 선별 → 시뮬레이션 → 보고 흐름을 종단 간으로 보여줍니다.
 - 교정 모드: 최소 Tier 1 Instagram 데이터셋이 수집되고 로드됩니다(Tier 2+는 스트레치 목표).
 
 ## 알려진 간격 및 열린 질문
