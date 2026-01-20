@@ -7,36 +7,29 @@
 | Software | Required Version | Verification Command |
 |----------|------------------|----------------------|
 | **Docker** | Desktop 4.0+ | `docker info` |
+| **Node.js** | 18+ (Dev) | `node --version` |
 | **Python** | 3.12+ | `python3 --version` |
 | **uv** | Latest | `uv --version` |
 
 ---
 
-## 1. Local SNS (Pixelfed) Setup
+## 1. Local SNS (SNS-Vibe) Setup
 
-### Option A: Script (Recommended)
-
-```bash
-./scripts/setup_sns.sh
-```
-
-### Option B: Manual
+New lightweight SvelteKit-based implementation.
 
 ```bash
-cd sns/pixelfed
-cp .env.docker.example .env
+cd sns-vibe
 
-docker-compose up -d --force-recreate
-```
+# Install dependencies
+npm install
 
-> **Wait Check**: 컨테이너(`pixelfed-app`, `pixelfed-db`, `pixelfed-redis`, `pixelfed-caddy`, `pixelfed-horizon`, `pixelfed-scheduler`)가 모두 `Running` 상태가 될 때까지 약 30초 대기한다. (`docker-compose ps`로 확인)
+# Start (Docker) - Recommended for Agent Test
+docker-compose up -d --build
+# Access at http://localhost:8383
 
-### Step 1.3: Data Seeding (World State Setting)
-빈 데이터베이스에 인플루언서, 에이전트, 관리자 계정을 주입한다.
-
-```bash
-# Seed Execution Pipe (필요 시 재시딩)
-cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
+# OR Start (Local Dev)
+npm run dev
+# Access at http://localhost:5173
 ```
 
 ---
@@ -46,10 +39,8 @@ cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
 ```bash
 cd agent
 cp .env.sample .env
-# .env에 OPENAI_API_KEY 설정 (선택: OPENAI_BASE_URL)
-# SNS 설정이 다르면 SNS_URL/SNS_EMAIL/SNS_PASSWORD도 수정
-# 기본 모델: crowd=gpt-5-mini, hero=computer-use-preview
-# 로그 레벨 조정: AGENT_LOG_LEVEL=DEBUG (선택)
+# .env에 OPENAI_API_KEY 설정
+# SNS_URL을 http://localhost:8383 으로 설정 (Docker 기준)
 
 uv sync
 uv run playwright install chromium

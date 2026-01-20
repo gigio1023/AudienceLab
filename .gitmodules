@@ -1,3 +1,0 @@
-[submodule "sns/pixelfed"]
-	path = sns/pixelfed
-	url = https://github.com/pixelfed/pixelfed.git

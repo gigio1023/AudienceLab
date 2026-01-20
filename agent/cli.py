@@ -29,6 +29,12 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--post-context", default=default_post_context())
     run_parser.add_argument("--crowd-count", type=int, default=8)
     run_parser.add_argument("--no-hero", action="store_true")
+    run_parser.add_argument(
+        "--hero-mode",
+        choices=["auto", "cua", "text"],
+        default="auto",
+        help="Hero decision mode: auto/text use gpt-5-mini; cua is deprecated and treated as text",
+    )
     run_parser.add_argument("--hero-persona", default=None)
     run_parser.add_argument("--persona-file", default=None)
     run_parser.add_argument("--target-persona", default=None)
@@ -38,6 +44,11 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--max-concurrency", type=int, default=6)
     run_parser.add_argument("--simulation-id", default=None)
     run_parser.add_argument("--run-id", default=None)
+    run_parser.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Use MCP-based Playwright agent execution (all agents use MCP tool calls)",
+    )
 
     smoke_parser = subparsers.add_parser("smoke-test", help="Quick dry-run validation")
     smoke_parser.add_argument("--verbose", action="store_true")
@@ -94,6 +105,7 @@ def main() -> None:
         message_tone=args.message_tone,
         crowd_count=args.crowd_count,
         hero_enabled=hero_enabled,
+        hero_mode=args.hero_mode,
         hero_persona_id=args.hero_persona,
         post_context=args.post_context,
         dry_run=args.dry_run,
@@ -102,6 +114,7 @@ def main() -> None:
         max_concurrency=args.max_concurrency,
         simulation_id=args.simulation_id,
         run_id=args.run_id,
+        mcp_enabled=args.mcp,
     )
 
     if not hero_enabled and config.crowd_count == 0:

@@ -7,7 +7,7 @@
 ```mermaid
 graph TD
     CLI[Agent CLI] --> Runner[agent/runner.py]
-    Runner -->|Browser (Hero, computer-use-preview)| Pixelfed[Local SNS (Pixelfed)]
+    Runner -->|Browser (Hero, computer-use-preview)| SNS[Local SNS (SNS-Vibe)]
     Runner -->|Headless (Crowd, gpt-5-mini)| LLM[OpenAI API]
     Runner --> Shared[shared/simulation/*.json]
     Runner --> Outputs[agent/outputs/*/actions.jsonl]
@@ -24,14 +24,12 @@ graph TD
    - CLI 기반 실행: `agent/cli.py`
    - Hero + Crowd 하이브리드 구조
    - 결과 파일: `shared/simulation/*.json`, `agent/outputs/*`
-2. **Local SNS (`sns/`)**
-   - Pixelfed Docker 환경
-   - 시드 스크립트: `sns/seed_hackathon.php`
+2. **Local SNS (`sns-vibe/`)**
+   - **SvelteKit + SQLite** Docker 환경 (Lightweight)
+   - 시드 데이터: `sns-vibe/seeds.json`
 3. **Shared Contract (`shared/`)**
    - 시뮬레이션 결과 스키마: `shared/simulation-schema.json`
-4. **Automation Script (`scripts/`)**
-   - SNS 초기화: `scripts/setup_sns.sh`
-5. **Evaluation (`agent/evaluator.py`)**
+4. **Evaluation (`agent/evaluator.py`)**
    - 액션 로그 기반 평가
    - 출력: `shared/evaluation/results/*.json`
 
@@ -44,7 +42,7 @@ graph TD
 1. **CLI Trigger**
    - `uv run python agent/cli.py run ...` 실행
 2. **Execution**
-   - Hero: Playwright 브라우저로 Pixelfed 로그인/피드 관찰/행동
+   - Hero: Playwright 브라우저로 **SNS-Vibe**(`http://localhost:8383`) 로그인/피드 관찰/행동
    - Crowd: 텍스트 기반 LLM 판단으로 대규모 반응 시뮬레이션
 3. **Outputs**
    - 시뮬레이션 상태/결과: `shared/simulation/{simulationId}.json`
@@ -68,8 +66,8 @@ graph TD
 ## 4. Security & Local Constraints
 
 - 모든 실행은 로컬 환경 기준
-- Pixelfed는 Self-Signed HTTPS 사용 (`https://localhost:8092`)
-- Playwright는 `ignore_https_errors=True`로 실행
+- SNS-Vibe는 HTTP 사용 (`http://localhost:8383`) - SSL 검증 불필요
+- Docker 컨테이너 격리
 
 ---
 
