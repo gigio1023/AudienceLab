@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "evaluationId": "example-eval",
+  "simulationId": "simulation-id-optional",
+  "runId": "run-id-optional",
+  "expected": {
+    "likeCount": 30,
+    "commentCount": 10,
+    "likeRate": 0.6,
+    "commentRate": 0.2
+  },
+  "perPersona": {
+    "vegan-mom": {
+      "likeCount": 8,
+      "commentCount": 3,
+      "likeRate": 0.7,
+      "commentRate": 0.3,
+      "weights": {
+        "likeCount": 0.4,
+        "commentCount": 0.6
+      }
+    }
+  },
+  "weights": {
+    "likeCount": 0.5,
+    "commentCount": 0.5,
+    "likeRate": 0.0,
+    "commentRate": 0.0
+  }
+}

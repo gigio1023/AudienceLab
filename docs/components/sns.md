@@ -1,6 +1,8 @@
 # SNS Environment Specification (Pixelfed)
 
-본 문서는 에이전트들이 활동할 가상의 소셜 미디어 공간인 **Local SNS Environment**의 상세 설계 명세서이다. 오픈소스 프로젝트인 **Pixelfed**를 기반으로 하며, 통제 가능하고 관찰 가능한 시뮬레이션 환경(Sandbox)을 제공한다.
+본 문서는 에이전트들이 활동할 가상의 소셜 미디어 공간인 **Local SNS Environment**의 상세 명세서이다. 현재 구현은 `sns/pixelfed` 기반의 Pixelfed 환경과 `sns/seed_hackathon.php` 시드 스크립트를 포함한다.
+
+빠른 초기화를 위해 `scripts/setup_sns.sh`를 사용할 수 있다.
 
 ## 1. Environment Topology
 
@@ -67,9 +69,10 @@ graph TD
 docker exec pixelfed-app php artisan cache:clear
 
 # Hard Reset (데이터 완전 초기화 및 재시딩) - 약 30초 소요
+cd sns/pixelfed
 docker-compose down -v
 docker-compose up -d
-cat seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
+cat ../seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
 ```
 
 ### 4.2 Monitoring

@@ -146,6 +146,7 @@ venv.bak/
 
 # Simulation outputs
 shared/simulation/*.json
+shared/evaluation/results/*.json
 
 # Spyder project settings
 .spyderproject

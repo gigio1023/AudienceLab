@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvaluationExpected",
+  "type": "object",
+  "required": ["schemaVersion", "expected"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "evaluationId": {"type": "string"},
+    "simulationId": {"type": "string"},
+    "runId": {"type": "string"},
+    "expected": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "likeCount": {"type": "number"},
+        "commentCount": {"type": "number"},
+        "likeRate": {"type": "number", "minimum": 0, "maximum": 1},
+        "commentRate": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "perPersona": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "likeCount": {"type": "number"},
+          "commentCount": {"type": "number"},
+          "likeRate": {"type": "number", "minimum": 0, "maximum": 1},
+          "commentRate": {"type": "number", "minimum": 0, "maximum": 1},
+          "weights": {
+            "type": "object",
+            "properties": {
+              "likeCount": {"type": "number"},
+              "commentCount": {"type": "number"},
+              "likeRate": {"type": "number"},
+              "commentRate": {"type": "number"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "weights": {
+      "type": "object",
+      "properties": {
+        "likeCount": {"type": "number"},
+        "commentCount": {"type": "number"},
+        "likeRate": {"type": "number"},
+        "commentRate": {"type": "number"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvaluationResult",
+  "type": "object",
+  "required": ["schemaVersion", "evaluationId", "createdAt", "input", "actual", "metrics"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "evaluationId": {"type": "string"},
+    "simulationId": {"type": ["string", "null"]},
+    "runId": {"type": ["string", "null"]},
+    "createdAt": {"type": "string"},
+    "input": {
+      "type": "object",
+      "required": ["expectedPath"],
+      "properties": {
+        "expectedPath": {"type": "string"},
+        "expected": {"type": "object"},
+        "perPersona": {"type": "object"},
+        "weights": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "actual": {
+      "type": "object",
+      "required": ["totals", "perPersona"],
+      "properties": {
+        "totals": {"type": "object"},
+        "perPersona": {"type": "object"}
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "likeCount": {"$ref": "#/definitions/metric"},
+        "commentCount": {"$ref": "#/definitions/metric"},
+        "likeRate": {"$ref": "#/definitions/metric"},
+        "commentRate": {"$ref": "#/definitions/metric"},
+        "overallSimilarity": {"type": ["number", "null"]}
+      }
+    },
+    "perPersona": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "likeCount": {"$ref": "#/definitions/metric"},
+          "commentCount": {"$ref": "#/definitions/metric"},
+          "likeRate": {"$ref": "#/definitions/metric"},
+          "commentRate": {"$ref": "#/definitions/metric"},
+          "overallSimilarity": {"type": ["number", "null"]}
+        }
+      }
+    }
+  },
+  "definitions": {
+    "metric": {
+      "type": "object",
+      "required": ["expected", "actual", "absError", "relativeError", "similarity"],
+      "properties": {
+        "expected": {"type": "number"},
+        "actual": {"type": "number"},
+        "absError": {"type": "number"},
+        "relativeError": {"type": "number"},
+        "similarity": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  },
+  "additionalProperties": false
+}

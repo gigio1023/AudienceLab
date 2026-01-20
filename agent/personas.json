@@ -1,0 +1,25 @@
+{
+  "personas": [
+    {
+      "id": "vegan-mom",
+      "name": "Vegan Mom",
+      "interests": ["animal welfare", "environment", "healthy food"],
+      "tone": "positive and supportive",
+      "reaction_bias": "positive"
+    },
+    {
+      "id": "beauty-analyst",
+      "name": "Beauty Analyst",
+      "interests": ["skincare", "ingredients", "product reviews"],
+      "tone": "curious and analytical",
+      "reaction_bias": "neutral"
+    },
+    {
+      "id": "cynical-memer",
+      "name": "Cynical Memer",
+      "interests": ["memes", "authenticity", "pop culture"],
+      "tone": "dry and skeptical",
+      "reaction_bias": "negative"
+    }
+  ]
+}

@@ -7,7 +7,9 @@ dependencies = [
   "openai>=1.40.0",
   "playwright>=1.46.0",
   "python-dotenv>=1.0.1",
+  "loguru>=0.7.2",
 ]
 
 [project.scripts]
 run-single-agent = "single_agent:main"
+run-agent = "cli:main"
