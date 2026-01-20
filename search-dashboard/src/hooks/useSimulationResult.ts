@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { SimulationResult } from "@/types/simulation";
+import type { SimulationOutput } from "@/types/simulation";
 
 type SimulationFeedStatus = "loading" | "ready" | "error";
 
@@ -10,7 +10,7 @@ type Options = {
 
 export function useSimulationResult(simulationId: string, options: Options = {}) {
   const intervalMs = options.intervalMs ?? 2000;
-  const [result, setResult] = useState<SimulationResult | null>(null);
+  const [result, setResult] = useState<SimulationOutput | null>(null);
   const [status, setStatus] = useState<SimulationFeedStatus>("loading");
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 

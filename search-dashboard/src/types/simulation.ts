@@ -1,41 +1,52 @@
-export interface SimulationResult {
+export interface SimulationOutput {
   simulationId: string;
   status: "pending" | "running" | "completed" | "failed";
   progress: number;
   createdAt: string;
+  updatedAt: string;
   config: {
-    post_description: string;
-    agent_count: number;
-    budget_total?: number;
-    budget_unit?: string;
-    action_costs?: Record<string, number>;
-  };
-  agents: AgentResult[];
-  metrics: {
-    total_agents: number;
-    reactions: {
-      positive: number;
-      neutral: number;
-      negative: number;
+    goal: string;
+    budget: number;
+    duration: number;
+    targetPersona: string;
+    parameters?: {
+      agentCount?: number;
+      messageTone?: string;
+      heroEnabled?: boolean;
+      crowdCount?: number;
+      postContext?: string;
+      dryRun?: boolean;
+      runId?: string;
     };
-    actions: {
-      like: number;
-      comment: number;
-      skip: number;
-    };
-    positive_rate: number;
-    engagement_rate: number;
-    sentiment_score: number;
   };
-  stigmergy_trace: string[];
+  result?: {
+    metrics: SimulationMetrics;
+    confidenceLevel: "low" | "medium" | "high";
+    agentLogs: unknown[];
+    personaTraces: PersonaTrace[];
+  };
 }
 
-export interface AgentResult {
-  persona_id: string;
-  persona_name: string;
-  reaction: "positive" | "neutral" | "negative";
-  action: "like" | "comment" | "skip";
-  comment_text: string | null;
-  internal_thought: string;
-  reasoning: string;
+export interface SimulationMetrics {
+  reach: number;
+  engagement: number;
+  conversionEstimate: number;
+  roas: number;
+}
+
+export interface PersonaTrace {
+  personaId?: string;
+  agentId?: string;
+  decision?: {
+    like?: boolean;
+    comment?: string | null;
+    follow?: boolean;
+    sentiment?: "positive" | "neutral" | "negative";
+    reasoning?: string;
+  };
+  actionResult?: {
+    method?: string;
+    status?: string;
+  };
+  postContext?: string;
 }
