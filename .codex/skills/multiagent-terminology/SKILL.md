@@ -1,181 +1,28 @@
 ---
 name: multiagent-terminology
-description: OpenAI 공식 Multi-Agent 용어집 및 프로젝트 매핑. 발표나 문서 작성 시 정확한 용어 사용을 위한 참조.
+description: Reference OpenAI multi-agent terminology and how it maps to this project. Use when writing docs, slides, or demo narration that needs precise terminology.
 ---
 
-# Multi-Agent Terminology Skill
+# Multi-Agent Terminology
 
-## Overview
+## Core terms
 
-OpenAI에서 제시하는 공식 Multi-Agent 용어와 이 프로젝트에서의 적용을 매핑합니다.
+- **Orchestrator-Subagent**: central runner coordinating agents.
+- **Agent Specialization**: distinct roles (e.g., reasoning vs action).
+- **Agentic Loop**: observe->reason->act->log.
+- **Stigmergy**: indirect coordination through the environment.
+- **Guardrails**: sandbox + budget limits + schema checks.
+- **Tracing**: structured logs and artifacts for inspection.
 
-## OpenAI Official Terminology (2025)
+## Project mapping (current MVP + planned)
 
-### Core Concepts
+- **Orchestrator**: future runner that spawns agents (planned).
+- **Subagents**: `agent/single_agent.py` today; multi-agent planned.
+- **Stigmergy**: comments and feed state as shared context (planned).
+- **Tracing**: `shared/simulation/*.json` with `agentLogs`.
 
-| 용어 | 정의 | 출처 |
-|------|------|------|
-| **Agents SDK** | Swarm의 Production 버전. 멀티에이전트 시스템 구축 프레임워크 | OpenAI |
-| **Handoff** | 에이전트가 다른 에이전트에게 제어권을 이전하는 메커니즘 | OpenAI Agents SDK |
-| **Agents as Tools** | Manager 에이전트가 다른 에이전트를 Tool처럼 호출하는 패턴 | OpenAI |
-| **Routines** | 에이전트가 따라야 할 사전 정의된 작업 순서 | OpenAI Swarm |
-| **Guardrails** | 입출력 검증, 안전성 체크를 위한 보호장치 | OpenAI Agents SDK |
-| **Tracing** | 에이전트 행동 모니터링/디버깅 기능 | OpenAI Agents SDK |
+## Phrases to use
 
-### Architecture Patterns
-
-| 패턴 | 설명 | 특징 |
-|------|------|------|
-| **Orchestrator-Subagent** | 중앙 Manager가 Subagent들을 조율 | 계층적, 중앙 제어 |
-| **Handoff Collaboration** | 에이전트 간 제어권 이전 | 전문가 위임 |
-| **Agent Specialization** | 에이전트별 전문 영역 분리 | 효율성, 깊이 |
-| **Agentic Loop** | Perceive → Reason → Act → Observe 반복 | 자율성 |
-
-## Project Mapping
-
-### 우리 프로젝트에서의 적용
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│              OpenAI Pattern → Project Implementation               │
-├────────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  Orchestrator-Subagent  →   Runner (main_runner.py)                │
-│                              ├── Hero Agent (1, Full Browser)      │
-│                              ├── Crowd Agents (N, Headless)        │
-│                              └── Evaluator (Metrics)               │
-│                                                                    │
-│  Agent Specialization   →   Brain-Body Separation                 │
-│                              • Brain: Crowd (Cognitive only)       │
-│                              • Body: Hero (Computer Use)           │
-│                                                                    │
-│  Stigmergy              →   SNS Environment Collaboration          │
-│                              • Agent A 댓글 → Agent B가 보고 반응   │
-│                              • 직접 통신 없이 환경 매개 협업         │
-│                                                                    │
-│  Agentic Loop           →   Agent Execution Cycle                  │
-│                              1. Observe: Screenshot                │
-│                              2. Reason: VLM Decision               │
-│                              3. Act: Like/Comment/Skip             │
-│                              4. Log: JSON Output                   │
-│                                                                    │
-│  Guardrails             →   Safety Measures                        │
-│                              • Sandbox: Local Pixelfed             │
-│                              • Budget Cap: Token Limit             │
-│                              • No PII: Local Only                  │
-│                                                                    │
-│  Tracing                →   Observability                          │
-│                              • Agent Logs                          │
-│                              • Screenshot Capture                  │
-│                              • Dashboard Progress                  │
-└────────────────────────────────────────────────────────────────────┘
-```
-
-## Terminology Cheat Sheet
-
-### 발표 시 사용할 표현
-
-#### ❌ 피해야 할 표현
-- "봇을 여러 개 돌립니다"
-- "API를 여러 번 호출합니다"
-- "랜덤으로 반응합니다"
-
-#### ✅ 사용할 표현
-- "**페르소나 기반 멀티에이전트 시스템**을 구현했습니다"
-- "OpenAI의 **Orchestrator-Subagent 패턴**을 적용했습니다"
-- "**Stigmergy**를 통해 에이전트 간 간접 협업을 구현했습니다"
-- "**Brain-Body Separation**으로 93% 비용을 절감했습니다"
-- "각 에이전트는 고유한 **페르소나**와 **Chain-of-Thought**로 의사결정합니다"
-
-### 기술 깊이를 보여주는 표현
-
-| 주제 | 표현 |
-|------|------|
-| 협업 구조 | "환경 기반 간접 협업(Stigmergy) 패턴" |
-| 효율성 | "Cognitive Swarm + Visual Hero 하이브리드" |
-| 확장성 | "Headless API로 100+ 에이전트 확장 가능" |
-| 현실성 | "Ground Truth 기반 Few-Shot Learning" |
-| 안전성 | "Sandbox Isolation + Guardrails" |
-
-## Quick Reference Card
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    MULTI-AGENT QUICK REFERENCE                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  🏗️ ARCHITECTURE                                                │
-│  ──────────────                                                 │
-│  • Orchestrator-Subagent: Runner → Hero + Crowd + Evaluator    │
-│  • Heterogeneous Agents: Brain(Crowd) + Body(Hero)             │
-│                                                                 │
-│  🔗 COLLABORATION                                               │
-│  ──────────────                                                 │
-│  • Stigmergy: 환경(SNS)을 통한 간접 소통                         │
-│  • Indirect Handoff: 댓글 → 다음 에이전트 Context               │
-│                                                                 │
-│  🔄 EXECUTION                                                   │
-│  ──────────────                                                 │
-│  • Agentic Loop: Observe → Reason → Act → Log                  │
-│  • Chain-of-Thought: 추론 과정 투명하게 기록                     │
-│                                                                 │
-│  🛡️ SAFETY                                                      │
-│  ──────────────                                                 │
-│  • Guardrails: Sandbox, Budget, PII Protection                 │
-│  • Tracing: Logs, Screenshots, Dashboard                       │
-│                                                                 │
-│  💰 EFFICIENCY                                                  │
-│  ──────────────                                                 │
-│  • 93% Cost Reduction (Hybrid Architecture)                    │
-│  • $0.65/simulation (vs $9.50 All-Visual)                      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Diagram Templates
-
-### Architecture Diagram (발표용)
-
-```
-                    ┌───────────────────────────────┐
-                    │     SIMULATION ORCHESTRATOR   │
-                    │   (OpenAI Agents SDK Pattern) │
-                    └───────────────┬───────────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              ▼                     ▼                     ▼
-     ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-     │  HERO AGENT  │      │ CROWD AGENTS │      │  EVALUATOR   │
-     │  (1, Visual) │      │ (N, Headless)│      │  (Metrics)   │
-     │              │      │              │      │              │
-     │ Computer Use │      │ Cognitive    │      │ Calibration  │
-     │ UX Validation│      │ Simulation   │      │ Ground Truth │
-     └──────────────┘      └──────────────┘      └──────────────┘
-              │                     │                     │
-              └─────────────────────┼─────────────────────┘
-                                    ▼
-                         ┌───────────────────┐
-                         │  LOCAL SNS ENV    │
-                         │  (Stigmergy Hub)  │
-                         └───────────────────┘
-```
-
-### Stigmergy Flow (협업 시각화)
-
-```
-    Agent A               Environment              Agent B
-    ───────               ───────────              ───────
-       │                       │                       │
-       │ Write Comment         │                       │
-       │──────────────────────▶│                       │
-       │                       │                       │
-       │                       │ Observe Comment       │
-       │                       │◀──────────────────────│
-       │                       │                       │
-       │                       │ React to Comment      │
-       │                       │──────────────────────▶│
-       │                       │                       │
-                      ═══════════════════
-                       No Direct Messaging
-                      ═══════════════════
-```
+- “persona-driven multi-agent simulation”
+- “orchestrator-subagent pattern with sandboxed SNS”
+- “stigmergic coordination via shared feed state”
