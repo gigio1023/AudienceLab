@@ -10,9 +10,11 @@ AudienceLab
 
 ### Persona-based User Agent Swarm for SNS Simulation
 ![](images/agent.png)
+
+### SNS created by Vibe Coding
 ![](images/sns.png)
 
-### Evaluation
+### Evaluation: Engagement Score + LLM-as-a-judge Quality Score
 ![](images/eval.png)
 
 ## 문제 정의
