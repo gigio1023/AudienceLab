@@ -17,9 +17,19 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from jinja2 import Environment, FileSystemLoader
 from loguru import logger
 from openai import OpenAI
+from pydantic import BaseModel
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
+
+
+class ActionResponse(BaseModel):
+    """Structured response for agent action decision."""
+    reasoning: str
+    target: str | None = None
+    comment_text: str | None = None
+    action: str
 
 from accounts import (
     DEFAULT_PASSWORD,
@@ -36,6 +46,34 @@ MAX_CONSECUTIVE_FAILURES = 3
 # Default max steps per agent loop
 DEFAULT_MAX_STEPS = 20
 
+# Exploration phase configuration
+EXPLORATION_STEPS = 5  # First N steps are exploration phase
+EXPLORATION_SCROLL_WEIGHT = 60  # % weight for scroll in exploration
+EXPLORATION_NOOP_WEIGHT = 30    # % weight for noop in exploration
+
+# Engagement phase configuration
+ENGAGEMENT_NOOP_WEIGHT = 50    # % weight for noop in engagement
+ENGAGEMENT_SCROLL_WEIGHT = 20  # % weight for scroll in engagement
+ENGAGEMENT_LIKE_WEIGHT = 15    # % weight for like in engagement
+ENGAGEMENT_COMMENT_WEIGHT = 10 # % weight for comment in engagement
+ENGAGEMENT_FOLLOW_WEIGHT = 5   # % weight for follow in engagement
+
+# Jinja2 environment
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+_jinja_env: Environment | None = None
+
+
+def get_jinja_env() -> Environment:
+    """Get or create Jinja2 environment."""
+    global _jinja_env
+    if _jinja_env is None:
+        _jinja_env = Environment(
+            loader=FileSystemLoader(str(TEMPLATES_DIR)),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+    return _jinja_env
+
 
 @dataclass
 class LocalAgentConfig:
@@ -47,19 +85,73 @@ class LocalAgentConfig:
     max_steps: int
     step_delay_min: float
     step_delay_max: float
-    headless: bool
+    headless: bool | None  # None = auto (hero headed, others headless)
     save_screenshots: bool
     output_dir: Path
 
 
 @dataclass
 class Persona:
-    """Agent persona definition."""
-    id: str
-    name: str
+    """Agent persona definition from sns-vibe personas.json."""
+    username: str
+    age_range: str
+    location: str
+    occupation: str
+    personality_traits: list[str]
+    communication_style: str
     interests: list[str]
-    tone: str
-    reaction_bias: str = "neutral"
+    preferred_content_types: list[str]
+    engagement_level: str
+    posting_frequency: str
+    active_hours: str
+    like_tendency: float
+    comment_tendency: float
+    follow_tendency: float
+    behavior_prompt: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Persona":
+        """Create Persona from dictionary."""
+        return cls(
+            username=data.get("username", "unknown"),
+            age_range=data.get("age_range", "unknown"),
+            location=data.get("location", "unknown"),
+            occupation=data.get("occupation", "unknown"),
+            personality_traits=data.get("personality_traits", []),
+            communication_style=data.get("communication_style", "casual"),
+            interests=data.get("interests", []),
+            preferred_content_types=data.get("preferred_content_types", []),
+            engagement_level=data.get("engagement_level", "medium"),
+            posting_frequency=data.get("posting_frequency", "rarely"),
+            active_hours=data.get("active_hours", ""),
+            like_tendency=float(data.get("like_tendency", 0.5)),
+            comment_tendency=float(data.get("comment_tendency", 0.3)),
+            follow_tendency=float(data.get("follow_tendency", 0.2)),
+            behavior_prompt=data.get("behavior_prompt", "You are a casual social media user."),
+        )
+
+
+def load_personas_from_seeds() -> list[Persona]:
+    """Load personas from sns-vibe/seeds/personas.json."""
+    agent_dir = Path(__file__).resolve().parent
+    seeds_path = agent_dir.parent / "sns-vibe" / "seeds" / "personas.json"
+
+    if not seeds_path.exists():
+        logger.warning("Personas file not found at {}, using default", seeds_path)
+        return []
+
+    with seeds_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    personas = []
+    for item in data:
+        try:
+            personas.append(Persona.from_dict(item))
+        except Exception as e:
+            logger.warning("Failed to parse persona: {} - {}", item.get("username"), e)
+
+    logger.info("Loaded {} personas from {}", len(personas), seeds_path)
+    return personas
 
 
 @dataclass
@@ -93,13 +185,17 @@ def iso_now() -> str:
 
 
 def load_local_config(
-    headless: bool = True,
+    headless: bool | None = None,  # None = auto (hero headed, others headless)
     save_screenshots: bool = False,
     output_dir: Path | None = None,
 ) -> LocalAgentConfig:
     """Load configuration from environment."""
     agent_dir = Path(__file__).resolve().parent
     load_dotenv(agent_dir / ".env")
+
+    # Default output to search-dashboard/public/simulation for live dashboard
+    if output_dir is None:
+        output_dir = agent_dir.parent / "search-dashboard" / "public" / "simulation"
 
     return LocalAgentConfig(
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
@@ -111,7 +207,7 @@ def load_local_config(
         step_delay_max=float(os.getenv("MCP_STEP_DELAY_MAX", "3.0")),
         headless=headless,
         save_screenshots=save_screenshots,
-        output_dir=output_dir or agent_dir / "outputs",
+        output_dir=output_dir,
     )
 
 
@@ -122,67 +218,58 @@ def build_openai_client(config: LocalAgentConfig) -> OpenAI:
     return OpenAI(api_key=config.openai_api_key)
 
 
-def build_decision_system_prompt(persona: Persona, sns_url: str) -> str:
-    """Build system prompt for action decision."""
-    return f"""You are a social media user deciding what action to take on a feed.
-You have a specific persona and should act according to it.
+def build_decision_system_prompt(
+    persona: Persona,
+    sns_url: str,
+    step_count: int,
+    max_steps: int,
+) -> str:
+    """Build system prompt for action decision using Jinja2 template."""
+    env = get_jinja_env()
+    template = env.get_template("system_prompt.j2")
 
-## Your Persona
-- Name: {persona.name}
-- Interests: {', '.join(persona.interests)}
-- Tone: {persona.tone}
-- Reaction bias: {persona.reaction_bias}
-
-## Rules
-1. You are browsing a local SNS at {sns_url}
-2. Available actions: like, comment, follow, scroll_down, scroll_up, noop, done
-3. Make decisions based on your persona's interests and reaction bias
-4. If you have a positive bias, you're more likely to like/comment
-5. If you have a negative bias, you're more critical and selective
-6. Act naturally - don't like/comment on everything
-
-## Action Guidelines by Persona Bias
-- positive: Like ~60% of relevant posts, comment ~30%, follow interesting users
-- neutral: Like ~30% of relevant posts, comment ~15%, rarely follow
-- negative: Like ~10% of posts, comment ~5% (often critical), almost never follow
-
-## Response Format
-You MUST respond with ONLY valid JSON in this exact format:
-{{"action": "<action_type>", "target": "<post_id or user_id or null>", "comment_text": "<text if commenting, else null>", "reasoning": "<brief explanation>"}}
-
-Valid action types: like, comment, follow, scroll_down, scroll_up, noop, done
-
-Examples:
-{{"action": "like", "target": "post-123", "comment_text": null, "reasoning": "Post about veganism matches my interests"}}
-{{"action": "comment", "target": "post-456", "comment_text": "Great point about climate change!", "reasoning": "Want to engage with environmental content"}}
-{{"action": "scroll_down", "target": null, "comment_text": null, "reasoning": "Looking for more interesting posts"}}
-{{"action": "noop", "target": null, "comment_text": null, "reasoning": "No interesting posts visible"}}
-{{"action": "done", "target": null, "comment_text": null, "reasoning": "Finished browsing for now"}}
-"""
+    return template.render(
+        persona=persona,
+        sns_url=sns_url,
+        actions=ACTION_TYPES,
+        step_count=step_count,
+        max_steps=max_steps,
+        exploration_steps=EXPLORATION_STEPS,
+        exploration_scroll_weight=EXPLORATION_SCROLL_WEIGHT,
+        exploration_noop_weight=EXPLORATION_NOOP_WEIGHT,
+        engagement_noop_weight=ENGAGEMENT_NOOP_WEIGHT,
+        engagement_scroll_weight=ENGAGEMENT_SCROLL_WEIGHT,
+        engagement_like_weight=ENGAGEMENT_LIKE_WEIGHT,
+        engagement_comment_weight=ENGAGEMENT_COMMENT_WEIGHT,
+        engagement_follow_weight=ENGAGEMENT_FOLLOW_WEIGHT,
+    )
 
 
-def build_decision_user_prompt(state: AgentState, page_content: str) -> str:
-    """Build user prompt for action decision."""
-    return f"""Current state:
-- Step: {state.step_count}
-- Actions taken: {len(state.actions_taken)}
-- Recent actions: {[a.get('action') for a in state.actions_taken[-5:]]}
+def build_decision_user_prompt(
+    state: AgentState,
+    page_content: str,
+    max_steps: int,
+) -> str:
+    """Build user prompt for action decision using Jinja2 template."""
+    env = get_jinja_env()
+    template = env.get_template("user_prompt.j2")
 
-## Current Page Content
-{page_content[:4000]}
+    # Limit page content to current visible area
+    limited_content = page_content[:4000]
 
-## Your Task
-Based on your persona ({state.persona.name}, {state.persona.reaction_bias} bias), decide what action to take.
+    phase = "exploration" if state.step_count <= EXPLORATION_STEPS else "engagement"
+    recent_actions = [a.get("action") for a in state.actions_taken[-5:]]
 
-Remember:
-- Look at the post content, usernames, and topics
-- Consider if posts match your interests
-- Don't over-engage (be selective based on your bias)
-- Use "done" if you've done enough actions or the feed is exhausted
-
-Respond with ONLY valid JSON:
-{{"action": "<type>", "target": "<id or null>", "comment_text": "<text or null>", "reasoning": "<why>"}}
-"""
+    return template.render(
+        persona=state.persona,
+        step_count=state.step_count,
+        max_steps=max_steps,
+        phase=phase,
+        actions_count=len(state.actions_taken),
+        recent_actions=recent_actions,
+        page_content=limited_content,
+        exploration_steps=EXPLORATION_STEPS,
+    )
 
 
 def parse_action_decision(response_text: str) -> ActionDecision:
@@ -298,10 +385,10 @@ class LocalPlaywrightAgent:
         self.context: BrowserContext | None = None
         self.page: Page | None = None
 
-        # Output directory
-        self.output_dir = config.output_dir / self.state.agent_id
+        # Output directory - flat structure for dashboard
+        self.output_dir = config.output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.log_path = self.output_dir / "actions.jsonl"
+        self.log_path = self.output_dir / f"{self.state.agent_id}.jsonl"
 
     def _log_action(self, action_data: dict[str, Any]) -> None:
         """Append action to JSONL log."""
@@ -320,7 +407,10 @@ class LocalPlaywrightAgent:
         if not self.config.save_screenshots or not self.page:
             return None
         try:
-            path = self.output_dir / f"{self.state.step_count:03d}_{name}.png"
+            # Create screenshots subdirectory
+            screenshots_dir = self.output_dir / "screenshots" / self.state.agent_id
+            screenshots_dir.mkdir(parents=True, exist_ok=True)
+            path = screenshots_dir / f"{self.state.step_count:03d}_{name}.png"
             await self.page.screenshot(path=str(path))
             return str(path)
         except Exception as e:
@@ -328,34 +418,36 @@ class LocalPlaywrightAgent:
             return None
 
     async def _get_decision(self, page_content: str) -> ActionDecision:
-        """Get action decision from OpenAI."""
+        """Get action decision from OpenAI using structured output."""
         try:
-            # Build request params - handle different model requirements
-            model = self.config.openai_model
-            is_new_model = "gpt-5" in model or "o1" in model or "o3" in model
-
-            request_params = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": build_decision_system_prompt(self.persona, self.config.sns_url)},
-                    {"role": "user", "content": build_decision_user_prompt(self.state, page_content)},
-                ],
-            }
-
-            # Newer models (gpt-5, o1, o3) don't support temperature and use max_completion_tokens
-            if is_new_model:
-                request_params["max_completion_tokens"] = 500
-                # Don't add temperature - these models only support default (1)
-            else:
-                request_params["max_tokens"] = 500
-                request_params["temperature"] = 0.7
+            system_prompt = build_decision_system_prompt(
+                self.persona,
+                self.config.sns_url,
+                self.state.step_count,
+                self.config.max_steps,
+            )
+            user_prompt = build_decision_user_prompt(
+                self.state,
+                page_content,
+                self.config.max_steps,
+            )
 
             response = await asyncio.to_thread(
-                self.client.chat.completions.create,
-                **request_params,
+                self.client.responses.parse,
+                model=self.config.openai_model,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                text_format=ActionResponse,
             )
-            response_text = response.choices[0].message.content or ""
-            return parse_action_decision(response_text)
+            parsed = response.output_parsed
+            return ActionDecision(
+                action=parsed.action,
+                target=parsed.target,
+                comment_text=parsed.comment_text,
+                reasoning=parsed.reasoning,
+            )
         except Exception as e:
             logger.error("Decision call failed: {}", e)
             return ActionDecision(action="noop", reasoning=f"API error: {e}")
@@ -610,12 +702,13 @@ class LocalPlaywrightAgent:
 
         logger.info(
             "Starting local agent: id={} persona={} max_steps={}",
-            self.state.agent_id, self.persona.id, max_steps,
+            self.state.agent_id, self.persona.username, max_steps,
         )
 
         async with async_playwright() as p:
-            # Launch browser
-            self.browser = await p.chromium.launch(headless=self.config.headless)
+            # Launch browser - hero agent is headed, others are headless
+            headless = not self.is_hero if self.config.headless is None else self.config.headless
+            self.browser = await p.chromium.launch(headless=headless)
             self.context = await self.browser.new_context(
                 viewport={"width": 1280, "height": 720},
             )
@@ -627,7 +720,7 @@ class LocalPlaywrightAgent:
                 logger.error("Agent {} failed to login", self.state.agent_id)
                 return {
                     "agentId": self.state.agent_id,
-                    "personaId": self.persona.id,
+                    "personaId": self.persona.username,
                     "status": "login_failed",
                     "stepsCompleted": 0,
                 }
@@ -676,7 +769,7 @@ class LocalPlaywrightAgent:
 
         summary = {
             "agentId": self.state.agent_id,
-            "personaId": self.persona.id,
+            "personaId": self.persona.username,
             "stepsCompleted": self.state.step_count,
             "actionsLogged": len(self.state.actions_taken),
             "endReason": end_reason,
@@ -700,7 +793,7 @@ async def run_local_agents_parallel(
     max_concurrency: int = 4,
     max_steps_per_agent: int | None = None,
     max_time_per_agent: float | None = None,
-    headless: bool = True,
+    headless: bool | None = None,  # None = auto (hero headed, others headless)
     save_screenshots: bool = False,
     output_dir: Path | None = None,
     hero_enabled: bool = True,
@@ -742,7 +835,7 @@ async def run_local_agents_parallel(
                 logger.exception("Agent {} crashed: {}", runner.state.agent_id, e)
                 return {
                     "agentId": runner.state.agent_id,
-                    "personaId": runner.persona.id,
+                    "personaId": runner.persona.username,
                     "status": "crashed",
                     "error": str(e),
                 }
@@ -778,37 +871,74 @@ async def run_local_agents_parallel(
 
 # CLI entry point for testing
 if __name__ == "__main__":
-    import sys
+    import argparse
+    from runner import configure_logger
 
-    # Simple CLI
-    agent_count = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    max_steps = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-    headless = "--headed" not in sys.argv
+    # Setup argument parser with good defaults
+    parser = argparse.ArgumentParser(
+        description="Run multi-agent SNS simulation",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--num-agents",
+        type=int,
+        default=3,
+        help="Number of agents to run",
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=10,
+        help="Maximum steps per agent",
+    )
+    parser.add_argument(
+        "--all-headed",
+        action="store_true",
+        help="Run all agents with visible browser (default: first agent headed, rest headless)",
+    )
+    parser.add_argument(
+        "--all-headless",
+        action="store_true",
+        help="Run all agents headless",
+    )
+    parser.add_argument(
+        "--screenshots",
+        action="store_true",
+        help="Save screenshots during execution",
+    )
+    args = parser.parse_args()
 
-    # Load personas from runner
-    from runner import load_personas, configure_logger
+    # Determine headless mode
+    if args.all_headed:
+        headless = False
+    elif args.all_headless:
+        headless = True
+    else:
+        headless = None  # auto: hero headed, others headless
+
+    # Configure logging
     configure_logger("INFO")
 
-    personas_data = load_personas()
-    # Convert to local Persona format
-    personas = [
-        Persona(
-            id=p.id,
-            name=p.name,
-            interests=p.interests,
-            tone=p.tone,
-            reaction_bias=getattr(p, "reaction_bias", "neutral"),
-        )
-        for p in personas_data
-    ]
+    # Load personas from sns-vibe/seeds/personas.json
+    personas = load_personas_from_seeds()
+    if not personas:
+        logger.error("No personas loaded, exiting")
+        import sys
+        sys.exit(1)
+
+    logger.info(
+        "Running {} agents with {} steps each (headless={})",
+        args.num_agents, args.max_steps, headless,
+    )
 
     results, metrics = asyncio.run(
         run_local_agents_parallel(
             personas=personas,
-            agent_count=agent_count,
-            max_concurrency=min(4, agent_count),
-            max_steps_per_agent=max_steps,
+            agent_count=args.num_agents,
+            max_concurrency=min(4, args.num_agents),
+            max_steps_per_agent=args.max_steps,
             headless=headless,
+            save_screenshots=args.screenshots,
         )
     )
 

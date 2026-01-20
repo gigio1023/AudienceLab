@@ -112,7 +112,7 @@ export default function App() {
     },
     {
       label: "Actions",
-      value: `${simulation.metrics.actions.like} likes · ${simulation.metrics.actions.comment} comments · ${simulation.metrics.actions.skip} skips`
+      value: `${actionCountsForBudget.like ?? 0} likes · ${actionCountsForBudget.comment ?? 0} comments · ${actionCountsForBudget.skip ?? 0} skips`
     },
     {
       label: "Active agents",
@@ -192,6 +192,19 @@ export default function App() {
               </span>
             </div>
             {latestActivity?.content && <p className="activity-note">{latestActivity.content}</p>}
+            {typeof latestActivity?.metadata?.screenshot === "string" && (
+              <div className="activity-screenshot" style={{ marginTop: "1rem" }}>
+                <img
+                  src={latestActivity.metadata.screenshot}
+                  alt="Agent view"
+                  style={{
+                    maxWidth: "100%",
+                    borderRadius: "0.5rem",
+                    border: "1px solid rgba(255,255,255,0.1)"
+                  }}
+                />
+              </div>
+            )}
             <div className="activity-meta">
               <span className="meta-label">Activity feed</span>
               <span className="meta-value">{activityLabel}</span>

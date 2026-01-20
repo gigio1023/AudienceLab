@@ -249,5 +249,96 @@
         "username": "music_vibes",
         "content": "Album progress update: 8/12 tracks complete! #album #progress",
         "createdAt": "2026-01-20T22:30:00"
+    },
+    {
+        "id": "mph_001",
+        "username": "mens_style_hero",
+        "content": "Summer vibes in the city. Linen suits are a must. #menswear #summerstyle",
+        "image_url": "/samples/men_style_1.jpg",
+        "createdAt": "2026-01-10T16:27:18.383442"
+    },
+    {
+        "id": "mph_002",
+        "username": "mens_style_hero",
+        "content": "Streetwear essentials: Hoodie + Cargo pants. simple but effective. #streetwear #ootd",
+        "image_url": "/samples/men_style_2.jpg",
+        "createdAt": "2026-01-11T04:27:18.383442"
+    },
+    {
+        "id": "mph_003",
+        "username": "mens_style_hero",
+        "content": "A gentleman's guide to accessories. Watch, ring, and confidence. #accessories #details",
+        "image_url": "/samples/men_style_3.jpg",
+        "createdAt": "2026-01-11T16:27:18.383442"
+    },
+    {
+        "id": "mph_004",
+        "username": "mens_style_hero",
+        "content": "Casual Friday. Denim on denim. #denim #casualstyle #ad #sponsored",
+        "image_url": "/samples/men_style_4.jpg",
+        "createdAt": "2026-01-12T04:27:18.383442"
+    },
+    {
+        "id": "mph_005",
+        "username": "mens_style_hero",
+        "content": "Sneaker rotation update. Which one is your favorite? #sneakers #kotd",
+        "image_url": "/samples/men_style_5.jpg",
+        "createdAt": "2026-01-12T16:27:18.383442"
+    },
+    {
+        "id": "mph_006",
+        "username": "mens_style_hero",
+        "content": "Suit up! Preparing for the gala tonight. #blacktie #formalwear",
+        "image_url": "/samples/men_style_6.jpg",
+        "createdAt": "2026-01-13T04:27:18.383442"
+    },
+    {
+        "id": "mph_007",
+        "username": "mens_style_hero",
+        "content": "Weekend getaway style. Comfortable yet sharp. #travelstyle #weekend",
+        "image_url": "/samples/men_style_7.jpg",
+        "createdAt": "2026-01-13T16:27:18.383442"
+    },
+    {
+        "id": "mph_008",
+        "username": "mens_style_hero",
+        "content": "Minimalist wardrobe: 5 pieces, 10 outfits. #minimalism #capsulewardrobe",
+        "image_url": "/samples/men_style_8.jpg",
+        "createdAt": "2026-01-14T04:27:18.383442"
+    },
+    {
+        "id": "mph_009",
+        "username": "mens_style_hero",
+        "content": "Layering tips for fall. Stay warm, look cool. #fallfashion #layering #ad #sponsored",
+        "image_url": "/samples/men_style_9.jpg",
+        "createdAt": "2026-01-14T16:27:18.383442"
+    },
+    {
+        "id": "mph_010",
+        "username": "mens_style_hero",
+        "content": "Gym fit vs Street fit. Balance is key. #gymwear #athleisure",
+        "image_url": "/samples/men_style_10.jpg",
+        "createdAt": "2026-01-15T04:27:18.383442"
+    },
+    {
+        "id": "mph_011",
+        "username": "mens_style_hero",
+        "content": "Vintage finding: 90s leather jacket. absolute gem. #vintage #thrift",
+        "image_url": "/samples/men_style_11.jpg",
+        "createdAt": "2026-01-15T16:27:18.383442"
+    },
+    {
+        "id": "mph_012",
+        "username": "mens_style_hero",
+        "content": "Morning coffee run. oversized tee and shorts. #chill #lifestyle",
+        "image_url": "/samples/men_style_12.jpg",
+        "createdAt": "2026-01-16T04:27:18.383442"
+    },
+    {
+        "id": "mph_013",
+        "username": "mens_style_hero",
+        "content": "Defining modern masculinity through style. #style #inspiration",
+        "image_url": "/samples/men_style_13.jpg",
+        "createdAt": "2026-01-16T16:27:18.383442"
     }
 ]

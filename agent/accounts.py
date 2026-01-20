@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-SNS_URL_DEFAULT = "http://localhost:8383"
+SNS_URL_DEFAULT = "http://localhost:18383"
 DEFAULT_PASSWORD = "password"
 
 AGENT_EMAILS = [f"agent{idx}@local.dev" for idx in range(1, 11)]

@@ -102,5 +102,10 @@
     {
         "username": "agent15",
         "display_name": "Agent 15"
+    },
+    {
+        "username": "mens_style_hero",
+        "display_name": "Alex Chen",
+        "bio": "Men's Fashion & Lifestyle | Streetwear & Suits"
     }
 ]

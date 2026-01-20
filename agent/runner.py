@@ -31,7 +31,7 @@ WORD_RE = re.compile(r"[a-zA-Z0-9]+")
 HASHTAG_RE = re.compile(r"#([\w-]+)")
 POST_URL_RE = re.compile(r"/(p|post|status|statuses|i/web/post)/", re.IGNORECASE)
 POST_CONTAINER_SELECTOR = (
-    "article, [role='article'], .status-card-component, .status-card, "
+    "[id^='post-'], article, [role='article'], .status-card-component, .status-card, "
     "[data-testid*='post'], .post, [data-post-id]"
 )
 
@@ -808,7 +808,7 @@ async def collect_post_candidates_from_dom(
     try:
         payload = await page.evaluate(
             """(limit) => {
-                const selector = "article, [role='article'], .status-card-component, .status-card, [data-testid*='post'], .post, [data-post-id]";
+                const selector = "[id^='post-'], article, [role='article'], .status-card-component, .status-card, [data-testid*='post'], .post, [data-post-id]";
                 const nodes = Array.from(document.querySelectorAll(selector));
                 const parseUsername = (href) => {
                     try {
@@ -1161,23 +1161,17 @@ async def login(
         await page.goto(sns_url, wait_until="domcontentloaded")
         await page.wait_for_load_state("networkidle")
 
-        login_input = page.locator("#login-input")
-        login_button = page.locator("#login-button")
+        login_input = page.locator("#username")
+        login_button = page.locator('button[type="submit"]')
         if await login_input.count() > 0:
             await login_input.first.click()
             await login_input.first.fill("")
             await login_input.first.type(username, delay=25)
             if await login_button.count() > 0:
                 await login_button.first.click()
-            await page.wait_for_timeout(500)
-            session_label = page.locator("#session-user")
-            label_text = ""
-            try:
-                if await session_label.count() > 0:
-                    label_text = (await session_label.first.inner_text()).strip().lower()
-            except Exception:
-                label_text = ""
-            if label_text and "not logged" not in label_text:
+            await page.wait_for_timeout(1500)
+            # SNS-Vibe redirects to /feed on successful login
+            if "/feed" in page.url:
                 logger.info("Login ok (sns-vibe) url={}", page.url)
                 return True, None
             return False, "sns_vibe_login_failed"
@@ -1215,24 +1209,28 @@ async def login(
         password_input = await find_first_locator(page, password_selectors)
         submit_button = await find_first_locator(page, submit_selectors)
 
-        if email_input is None or password_input is None:
-            logger.warning("Login failed: missing form fields url={}", page.url)
+        if email_input is None:
+            logger.warning("Login failed: missing username/email field url={}", page.url)
             return False, "login_fields_not_found"
 
-        ok, error = await fill_field_exact(email_input, email, "email")
+        ok, error = await fill_field_exact(email_input, username or email, "email")
         if not ok:
             logger.warning("Login failed: {}", error)
             return False, error
 
-        ok, error = await fill_field_exact(password_input, password, "password")
-        if not ok:
-            logger.warning("Login failed: {}", error)
-            return False, error
+        # Password field is optional (SNS-Vibe only requires username)
+        if password_input is not None:
+            ok, error = await fill_field_exact(password_input, password, "password")
+            if not ok:
+                logger.warning("Login failed: {}", error)
+                return False, error
 
         if submit_button is not None:
             await submit_button.click()
-        else:
+        elif password_input is not None:
             await password_input.press("Enter")
+        else:
+            await email_input.press("Enter")
 
         try:
             await page.wait_for_url(lambda url: "/login" not in url, timeout=8000)

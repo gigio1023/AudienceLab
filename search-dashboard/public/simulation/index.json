@@ -1,4 +1,9 @@
 {
-  "updated_at": "2025-10-03T00:00:00Z",
-  "files": ["agent-01.jsonl", "agent-02.jsonl", "agent-03.jsonl"]
+  "updated_at": "2026-01-20T16:04:44.422375",
+  "files": [
+    "local-hero-001.jsonl",
+    "local-crowd-002.jsonl",
+    "local-crowd-003.jsonl",
+    "local-crowd-004.jsonl"
+  ]
 }
