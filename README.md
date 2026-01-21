@@ -131,5 +131,5 @@ Component READMEs:
 
 | Name | Focus |
 | --- | --- |
-| Seongho Park | Simulation + SNS |
+| Sungho Park | Simulation + SNS |
 | Seunghyun Lee | Crawler |
