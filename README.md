@@ -109,11 +109,16 @@ Component READMEs:
 
 ## Demo Screenshots
 
-- `images/dash01.png`
-- `images/dash02.png`
-- `images/agent.png`
-- `images/sns.png`
-- `images/eval.png`
+<div align="center">
+  <img src="images/dash01.png" alt="Dashboard overview 1" width="420" />
+  <img src="images/dash02.png" alt="Dashboard overview 2" width="420" />
+</div>
+
+<div align="center">
+  <img src="images/agent.png" alt="Agent swarm view" width="420" />
+  <img src="images/sns.png" alt="Local SNS view" width="420" />
+  <img src="images/eval.png" alt="Evaluation view" width="420" />
+</div>
 
 ## Known Limitations
 
