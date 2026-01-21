@@ -1,31 +1,33 @@
-# Seed Accounts (Local Pixelfed)
+# Seed Accounts (SNS-Vibe)
 
-Login method: email + password
-Default password: password
+Login method: username-only (SNS-Vibe)
 
-SNS URL
-- https://localhost:8092
+SNS URL (default)
+- http://localhost:8383
 
 Agent accounts (seed)
-- agent1@local.dev
-- agent2@local.dev
-- agent3@local.dev
-- agent4@local.dev
-- agent5@local.dev
-- agent6@local.dev
-- agent7@local.dev
-- agent8@local.dev
-- agent9@local.dev
-- agent10@local.dev
+- agent1
+- agent2
+- agent3
+- agent4
+- agent5
+- agent6
+- agent7
+- agent8
+- agent9
+- agent10
+- agent11
+- agent12
+- agent13
+- agent14
+- agent15
 
 Influencer accounts (seed)
-- influencer1@local.dev
-- influencer2@local.dev
-- influencer3@local.dev
+- Example seeds live in `sns-vibe/seeds/users.json`
 
 Admin account (seed)
-- admin@local.dev
+- admin
 
 Code references
 - `agent/accounts.py` provides these defaults for agent code.
-- `SNS_EMAIL` overrides only when it matches a seed agent email.
+- `SNS_USERNAME` overrides only when it matches a seed username.

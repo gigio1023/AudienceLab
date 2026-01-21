@@ -25,9 +25,9 @@
 
 | 디렉토리 | 역할 | 기술 스택 |
 |-----------|------|------------|
-| `sns/` | 로컬 SNS 플랫폼 (시뮬레이션 스테이지) | Pixelfed, Docker, MySQL, Redis |
 | `agent/` | 페르소나 기반 브라우저 에이전트 | Python, Playwright, OpenAI Computer Use API |
 | `dashboard/` | 시뮬레이션 + 보고 UI (검색은 사전 완료 가정) | React, TypeScript, Vite |
+| `sns-vibe/` | 로컬 SNS 시뮬레이션 (경량) | SvelteKit, TypeScript, SQLite |
 | `insta-crawler/` | Instagram 크롤러 + 데이터셋 도구 | Python, Playwright, SQLite |
 | `shared/` | 파일 기반 교환 (스키마, 시뮬레이션 결과) | JSON Schema |
 | `context/` | 연구 노트 (참조 전용) | Markdown |
@@ -46,11 +46,6 @@
 - 에이전트별 JSONL 로그를 `dashboard/public/simulation/*.jsonl`에 append 합니다.
 - `__files.json`이 존재하면 대시보드는 해당 파일 목록을 기준으로 폴링합니다.
 - 스펙은 `docs/contracts/simulation.md`와 `docs/components/dashboard.md`를 참조합니다.
-
-## Agent Skills
-
-프로젝트 내 Agent Skills 가이드는 `docs/AGENT_SKILLS.md`에 정리되어 있습니다.
-- JSONL 활동 로그를 위한 스킬: `.codex/skills/jsonl-activity-feed/`
 
 ## Instagram 데이터 요구사항
 
@@ -85,77 +80,15 @@ Comment (Tier 2+): comment_id, shortcode, owner_username, created_at, text, fetc
 
 1. 인플루언서 시드 및 참여 신호에 대한 일회성 Instagram 크롤 실행.
 2. 크롤링된 데이터에서 인플루언서 + 팔로워 페르소나/코호트 구축 (Tier 2 데이터가 누락된 경우에만 폴백 템플릿 허용).
-3. 인플루언서 및 기존 게시물을 로컬 SNS(`sns/`)로 미러링.
+3. 인플루언서 및 기존 게시물을 로컬 SNS(`sns-vibe/`)로 미러링.
 4. 회사 쿼리의 경우, 후보 인플루언서를 선택하고 캠페인 시뮬레이션 구성.
-5. 페르소나 기반 팔로워 에이전트(`agent/`)를 실행하여 Pixelfed에서 반응 시뮬레이션.
+5. 페르소나 기반 팔로워 에이전트(`agent/`)를 실행하여 로컬 SNS에서 반응 시뮬레이션.
 6. 로그 및 메트릭 집계, 과거 참여 데이터와 비교 (Tier 1+).
 7. 대시보드(`dashboard/`)에서 사전 선별된 리스트로 시뮬레이션 및 보고 흐름 표시.
 
 ---
 
 ## 컴포넌트별 가이드
-
-### SNS (`sns/`)
-
-Pixelfed(Laravel 기반 ActivityPub 사진 공유 플랫폼) 로컬 개발 환경입니다. Docker Compose로 애플리케이션, MySQL 데이터베이스, Redis 캐시, 백그라운드 워커를 조율합니다.
-
-#### 해커톤 모드: 속도 우선
-
-**우선순위**: 기능 가용성 > 보안 / 모범 사례
-- **보안**: API 키, 하드코딩된 비밀번호(`password`), `777` 권한에 대한 경고 무시. 의도적인 것입니다.
-- **데이터 무결성**: 표준 API가 실패할 경우 "더티" DB 주입이 허용됩니다.
-- **목표**: AI 에이전트를 위한 즉시 재생 가능한 샌드박스 제공
-
-#### 디렉토리 구조 및 핵심 파일
-
-- **`pixelfed/`**: 메인 프로젝트 디렉토리
-  - **`.env`**: 환경변수의 단일 진실의 원천. 중요: 이를 수정하면 컨테이너를 다시 생성해야 합니다 (`docker-compose up -d --force-recreate`).
-  - **`docker-compose.yml`**: 인프라 정의. Caddy를 통해 **8092**로 HTTPS 제공
-  - **`docker-compose.override.yml`**: 로컬 포트/프록시 설정
-  - **`Caddyfile`**: Self-signed TLS + 리버스 프록시 설정
-  - **`artisan`**: Laravel CLI 진입점 (호스트에서 직접 실행 금지; 컨테이너 내에서 실행)
-- **`seed_hackathon.php`**: 빠른 데이터 채우기 스크립트 (`sns/seed_hackathon.php`)
-
-#### 운영 가이드라인
-
-**실행 환경**
-- 호스트 머신에서 `php` 또는 `composer` 명령을 직접 실행하지 마십시오.
-- 애플리케이션 명령은 항상 `pixelfed-app` 컨테이너 내에서 실행하십시오.
-
-```bash
-docker exec pixelfed-app php artisan <command>
-```
-
-**시뮬레이션 데이터 관리**
-에이전트용 스테이지 재설정 및 준비:
-1. DB 삭제: `docker exec pixelfed-app php artisan migrate:fresh`
-2. 데이터 시드: 해커톤 스크립트를 tinker로 파이프
-   ```bash
-   cat sns/seed_hackathon.php | docker exec -i pixelfed-app php artisan tinker
-   ```
-   (에이전트, 인플루언서, 사진 게시물 생성 및 팔로우 연결)
-
-**빠른 부트스트랩**
-- `./scripts/setup_sns.sh`로 서브모듈 초기화 + `.env` 주입 + Caddy 설정 + 컨테이너 기동 + 시드를 한 번에 수행할 수 있음
-
-**Codex 스킬**
-- `.codex/skills/sns-environment/SKILL.md`에 정의된 `sns-environment` 스킬을 사용해 동일한 부트스트랩 절차를 재현할 수 있음
-
-**트러블슈팅**
-- **404 에러**: `.env`의 `APP_DOMAIN` 불일치 또는 오래된 라우트 캐시로 인한 경우가 많음
-  - 해결: `APP_DOMAIN=localhost` 확인 후 `php artisan route:clear` 실행
-- **500 에러**: `storage/logs/laravel.log` 확인
-- **환경 변경**: `.env` 변경에 `docker-compose restart`는 충분하지 않습니다. `docker-compose up -d --force-recreate` 사용
-
-**빠른 참조**
-- 앱 URL: `https://localhost:8092`
-- 컨테이너 이름: `pixelfed-app`
-- 로그인 방식: 이메일 / 비밀번호 (`<username>@local.dev`)
-- 기본 비밀번호: `password`
-- 에이전트 계정 이메일: `agent1@local.dev`, `agent2@local.dev`...
-- 인플루언서 계정 이메일: `influencer1@local.dev`...
-
----
 
 ### Agent (`agent/`)
 
@@ -488,7 +421,7 @@ Instagram에서 인플루언서/팔로워 데이터를 수집하는 크롤러와
 
 - 루트 개요: `README.md`, `PLANS.md`, `PROJECT_DEFINITION.md`
 - 공유 계약: `shared/README.md`, `shared/simulation-schema.json`
-- 로컬 SNS 설정: `docs/components/sns.md`
+- 로컬 SNS 설정: `sns-vibe/README.md`
 - 에이전트 시뮬레이션: `agent/README.md`, `agent/AGENTS.md`
 - 대시보드 UX: `dashboard/README.md`
 - Instagram 크롤러: `insta-crawler/README.md`, `insta-crawler/PLANS.md`, `insta-crawler/AGENTS.md`

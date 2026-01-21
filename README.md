@@ -20,7 +20,6 @@ Closed loop: **data → personas → simulation → metrics → ranking + ration
 | --- | --- |
 | `agent/` | Persona-based multi-agent simulator (Playwright + OpenAI) |
 | `dashboard/` | Simulation + reporting UI (React/Vite) |
-| `sns/` | Pixelfed-based local SNS sandbox (Docker) |
 | `sns-vibe/` | Lightweight SNS for fast local runs (SvelteKit + SQLite) |
 | `eval-agent/` | Evaluation scripts (metrics + LLM comment quality) |
 | `shared/` | File-based contracts and outputs (JSON Schema) |
@@ -73,17 +72,6 @@ cp .env.sample .env
 uv sync
 uv run python evaluate.py
 ```
-
-## Full SNS Sandbox (Pixelfed)
-
-Pixelfed is the heavier, more realistic SNS sandbox. It runs via Docker Compose.
-
-```bash
-./scripts/setup_sns.sh
-# then open https://localhost:8092
-```
-
-Use this when you want a more realistic SNS environment instead of the lightweight `sns-vibe/` app.
 
 ## Outputs and Contracts
 

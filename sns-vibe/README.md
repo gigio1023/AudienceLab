@@ -1,6 +1,6 @@
 # SNS-Vibe
 
-Lightweight, agent-friendly social media simulation platform built for fast iteration during the hackathon. It serves as a controllable alternative to the heavier Pixelfed stack in `sns/`.
+Lightweight, agent-friendly social media simulation platform built for fast iteration during the hackathon.
 
 ## Why This Exists
 
