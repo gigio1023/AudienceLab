@@ -16,8 +16,8 @@ eggs/
 .eggs/
 lib/
 !sns-vibe/src/lib/
-!search-dashboard/src/lib/
-!search-dashboard/src/lib/**
+!dashboard/src/lib/
+!dashboard/src/lib/**
 lib64/
 parts/
 sdist/

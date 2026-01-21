@@ -1,5 +1,6 @@
 import { useActivityFeedIndex } from "@/hooks/useActivityFeedIndex";
 import { useAgentActivityFeed } from "@/hooks/useAgentActivityFeed";
+import { useEvaluationResult } from "@/hooks/useEvaluationResult";
 import { useSimulationResult } from "@/hooks/useSimulationResult";
 import personasData from "../../sns-vibe/seeds/personas.json";
 
@@ -19,6 +20,8 @@ type PersonaSeed = {
 
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const formatNumber = (value: number) => numberFormatter.format(value);
+const formatRate = (value?: number) =>
+  typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "—";
 const defaultActionCosts: Record<string, number> = {
   like: 1,
   comment: 3,
@@ -33,6 +36,12 @@ export default function App() {
   const simulationId = import.meta.env.VITE_SIMULATION_ID ?? "latest";
   const { result, status, lastUpdated } = useSimulationResult(simulationId, { intervalMs: 2000 });
   const simulation = result;
+  const evaluationId = import.meta.env.VITE_EVALUATION_ID ?? "latest";
+  const {
+    result: evaluationResult,
+    status: evaluationStatus,
+    lastUpdated: evaluationUpdated
+  } = useEvaluationResult(evaluationId, { intervalMs: 5000 });
   const { index: activityIndex } = useActivityFeedIndex({ intervalMs: 5000 });
   const envFiles = (import.meta.env.VITE_AGENT_FEEDS ?? "agent-01.jsonl,agent-02.jsonl,agent-03.jsonl")
     .split(",")
@@ -110,6 +119,31 @@ export default function App() {
     roas: 0
   };
   const confidenceLevel = simulation?.result?.confidenceLevel ?? "live";
+  const evaluationTotals = evaluationResult?.actual?.totals ?? {};
+  const evaluationSimilarity =
+    typeof evaluationResult?.metrics?.overallSimilarity === "number"
+      ? `${(evaluationResult.metrics.overallSimilarity * 100).toFixed(1)}%`
+      : "—";
+  const evaluationQuality =
+    typeof evaluationTotals.qualityAverage === "number"
+      ? `${evaluationTotals.qualityAverage.toFixed(2)} / 5.0`
+      : "—";
+  const evaluationQualityGrade =
+    typeof evaluationTotals.qualityGrade === "string" ? evaluationTotals.qualityGrade : "—";
+  const evaluationEngagementRate =
+    typeof evaluationTotals.engagementRate === "number"
+      ? formatRate(evaluationTotals.engagementRate)
+      : "—";
+  const evaluationMarketingRate =
+    typeof evaluationTotals.marketingEngagementRate === "number"
+      ? formatRate(evaluationTotals.marketingEngagementRate)
+      : "—";
+  const evaluationSource =
+    evaluationId === "latest"
+      ? "/evaluation/latest.json"
+      : `/evaluation/results/${evaluationId}.json`;
+  const evaluationLabel =
+    evaluationStatus === "error" ? "missing" : evaluationStatus === "loading" ? "loading" : "ready";
   const statCards = [
     {
       label: "Reach",
@@ -269,6 +303,48 @@ export default function App() {
             </div>
             <p className="activity-footnote">Source: /simulation/{simulationId}.json</p>
           </div>
+        </section>
+
+        <section className="evaluation-section">
+          <div className="section-header">
+            <h2>Evaluation snapshot</h2>
+            <p>LLM judge + engagement summary from the evaluation run.</p>
+          </div>
+          {evaluationResult ? (
+            <>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <span className="stat-label">Engagement rate</span>
+                  <span className="stat-value">{evaluationEngagementRate}</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Marketing engagement</span>
+                  <span className="stat-value">{evaluationMarketingRate}</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Comment quality</span>
+                  <span className="stat-value">{evaluationQuality}</span>
+                  <span className="stat-note">{evaluationQualityGrade}</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Overall similarity</span>
+                  <span className="stat-value">{evaluationSimilarity}</span>
+                </div>
+              </div>
+              <div className="evaluation-meta">
+                <span className="meta-label">Status</span>
+                <span className="meta-value">{evaluationLabel}</span>
+                <span className="meta-label">Updated</span>
+                <span className="meta-value">
+                  {evaluationUpdated ? new Date(evaluationUpdated).toLocaleTimeString() : "waiting"}
+                </span>
+                <span className="meta-label">Source</span>
+                <span className="meta-value">{evaluationSource}</span>
+              </div>
+            </>
+          ) : (
+            <div className="empty-card">No evaluation result yet. Run eval-agent to populate the feed.</div>
+          )}
         </section>
 
         <section className="agents-section">

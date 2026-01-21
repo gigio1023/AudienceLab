@@ -1,364 +1,103 @@
-# Agent System - Local Playwright + OpenAI
+# Agent Simulator
 
-Simple swarm-based simulation for social media engagement using local Playwright automation with OpenAI decision-making. The current entrypoint is `local_agent.py`, and logs are written for live dashboard monitoring and evaluation.
+Persona-driven multi-agent swarm that operates a local SNS via Playwright and uses OpenAI for action decisions. It writes JSONL activity logs for the dashboard and can emit structured simulation status files for downstream consumers.
 
-## Table of Contents
+## Role in the System
 
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Setup](#setup)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Outputs](#outputs)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development)
+- **Input**: Personas + local SNS feed
+- **Action**: Browse, like, comment, follow with human-like timing
+- **Output**:
+  - Live JSONL logs for the dashboard
+  - (Optional) `shared/simulation/{simulationId}.json` for status/progress
 
-## Architecture
+## Entrypoints
 
-### Simple Swarm Design
+- `local_agent.py`: fastest path for a small swarm and live JSONL logs
+- `runner.py`: structured simulation runner that writes `shared/simulation/*.json`
 
-The agent system is **local-first**:
+## Quick Start (SNS-Vibe)
 
-1. **Playwright runs locally** - Browser automation executes on your machine
-2. **OpenAI makes decisions** - AI determines actions based on page content and persona
-3. **Single entrypoint** - `local_agent.py` starts the swarm and writes logs for monitoring
+**Prerequisites**:
+- Node.js 18+
+- Python 3.11+
+- `uv`
+- OpenAI API key
 
-**LocalPlaywrightAgent** (`local_agent.py`)
-- Manages browser lifecycle and page navigation
-- Extracts visible page content for decision-making
-- Executes actions (like, comment, scroll, noop)
-- Logs all actions to JSONL files (dashboard + evaluation input)
-
-**Personas**
-- Each agent has a unique persona with interests and behavior patterns
-- Personas influence action decisions and comment content
-
-## Quick Start
-
-```bash
-cd agent
-uv sync
-uv run python local_agent.py
-```
-
-## Setup
-
-### Prerequisites
-
-- **Node.js 18+** - For SNS-Vibe server
-- **Python 3.10+** - For agent system
-- **uv** (recommended) - Fast Python package manager
-
-Install uv:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-### Manual Setup
-
-#### 1. Set up SNS-Vibe
-
+### 1) Start SNS-Vibe
 ```bash
 cd ../sns-vibe
 npm install
+bash scripts/reset-db.sh
+npm run dev -- --port 8383
 ```
 
-#### 2. Set up Agent Environment
-
+### 2) Configure and Install Agent Dependencies
 ```bash
-cd agent
+cd ../agent
 cp .env.sample .env
-# Edit .env and set OPENAI_API_KEY
-
-# Using uv (recommended)
+# Set OPENAI_API_KEY and SNS_URL=http://localhost:8383
 uv sync
 uv run playwright install chromium
 ```
 
-#### 3. Configure Environment
-
-Edit `agent/.env`:
-
+### 3) Run a Swarm
 ```bash
-# OpenAI Configuration
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5-mini
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# SNS Configuration
-SNS_URL=http://localhost:8383
-SNS_EMAIL=local-hero-001@example.com
-SNS_PASSWORD=password
-
-# Agent Configuration
-MCP_MAX_STEPS=35
-MCP_STEP_DELAY_MIN=1.0
-MCP_STEP_DELAY_MAX=3.0
-```
-
-#### 4. Start SNS-Vibe Server
-
-```bash
-cd ../sns-vibe
-npm run dev -- --port 8383
-```
-
-#### 5. Run Agent Simulation
-
-```bash
-cd ../agent
 uv run python local_agent.py
+# or: uv run python runner.py --num-agents 3
 ```
 
 ## Configuration
 
-### Environment Variables
+The agent reads environment variables from `agent/.env`.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | - | OpenAI API key (required) |
-| `OPENAI_MODEL` | `gpt-5-mini` | OpenAI model to use |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API endpoint |
-| `SNS_URL` | `http://localhost:8383` | SNS-Vibe server URL |
-| `SNS_EMAIL` | `local-hero-001@example.com` | Login email for hero agent |
-| `SNS_PASSWORD` | `password` | Login password |
-| `MCP_MAX_STEPS` | `35` | Maximum steps per agent |
-| `MCP_STEP_DELAY_MIN` | `1.0` | Minimum delay between steps (seconds) |
-| `MCP_STEP_DELAY_MAX` | `3.0` | Maximum delay between steps (seconds) |
-| `MCP_REQUIRE_APPROVAL` | `never` | Approval mode (never/always) |
+**Required**:
+- `OPENAI_API_KEY`
 
-### Model Compatibility
+**Common**:
+- `SNS_URL` (default: `http://localhost:18383`; set to `http://localhost:8383` for SNS-Vibe)
+- `OPENAI_MODEL` (default: `gpt-5-mini`)
+- `OPENAI_BASE_URL` (optional)
+- `MCP_MAX_STEPS`, `MCP_STEP_DELAY_MIN`, `MCP_STEP_DELAY_MAX`
+- `AGENT_LOG_LEVEL`
 
-The system automatically handles different OpenAI model requirements:
-
-**New models (gpt-5, o1, o3)**:
-- Use `max_completion_tokens` instead of `max_tokens`
-- Only support default temperature (1)
-
-**Legacy models (gpt-4, gpt-3.5)**:
-- Use `max_tokens`
-- Support custom `temperature` values
-
-This is handled automatically in `local_agent.py:_get_decision()`.
-
-## Usage
-
-Make sure SNS-Vibe is running first:
-
-```bash
-# In terminal 1
-cd sns-vibe
-npm run dev -- --port 8383
-
-# In terminal 2
-cd agent
-uv run python local_agent.py
-```
-
-**Options:**
-- `--num-agents N` - Number of swarm agents (default: 3)
-- `--max-steps N` - Maximum steps per agent (default: 10)
-- `--all-headed` - Show all browser windows
-- `--all-headless` - Run all agents headless
-- `--screenshots` - Save screenshots during execution
+**Runner-only (used by `runner.py`)**:
+- `SNS_EMAIL`, `SNS_PASSWORD`, `SNS_USERNAME`
+- `OPENAI_COMPUTER_USE_MODEL`
+- `OPENAI_REASONING_EFFORT`
+- `OPENAI_AUTO_ACK_SAFETY_CHECKS`
+- `PLAYWRIGHT_MCP_URL`
 
 ## Outputs
 
-Agent action logs are written as JSONL for live monitoring in the dashboard and for evaluation:
+- **Live logs**: `dashboard/public/simulation/{agentId}__{personaId}.jsonl`
+- **Screenshots** (optional): `dashboard/public/simulation/screenshots/`
+- **Simulation status** (runner): `shared/simulation/{simulationId}.json`
 
-- **Dashboard logs**: `search-dashboard/public/simulation/*.jsonl` (default output dir)
-- **Evaluation**: run `eval-agent/` after the swarm finishes to assess results
+## DOM Expectations (SNS-Vibe)
 
-### JSONL Action Log Format
+Selectors are optimized for predictable IDs. Comment actions look for:
 
-Each agent log file (`{agentId}__{personaId}.jsonl`) contains one JSON object per line:
+- `#comment-input-{postId}` or `#post-{postId} [data-action='comment-input']`
+- `#comment-button-{postId}` or `#post-{postId} [data-action='comment-submit']`
 
-```json
-{
-  "timestamp": "2026-01-20T06:15:25.136941+00:00",
-  "agentId": "local-crowd-001",
-  "step": 1,
-  "status": "success",
-  "decision": {
-    "action": "comment",
-    "target": "post-17",
-    "comment_text": "This looks amazing!",
-    "reasoning": "Post aligns with my interests"
-  },
-  "result": {
-    "action": "comment",
-    "target": "post-17",
-    "success": true
-  }
-}
-```
+If you swap the SNS frontend, keep these selectors or update them in `local_agent.py`.
 
 ## Troubleshooting
 
-### Common Issues
+- **Playwright executable missing**
+  ```bash
+  uv run playwright install chromium
+  ```
 
-#### 1. "Comment input/button not found"
+- **Cannot reach SNS**
+  - Ensure the SNS server is running
+  - Verify `SNS_URL` matches the port you started
 
-**Problem**: Agent cannot find comment input or button selectors.
+- **No comments posted**
+  - Check DOM IDs in the SNS UI match the selectors above
 
-**Solution**: The system automatically extracts numeric post IDs from targets. Ensure SNS-Vibe DOM structure matches:
-- Comment input: `#comment-input-{postId}`
-- Comment button: `#comment-button-{postId}`
+## Related Docs
 
-See `local_agent.py:_extract_post_id()` for ID extraction logic.
-
-#### 2. "Unsupported parameter: 'max_tokens'"
-
-**Problem**: Using incompatible parameters with newer OpenAI models.
-
-**Solution**: The system auto-detects model type. If you see this error, ensure `local_agent.py:_get_decision()` has proper model detection:
-```python
-is_new_model = "gpt-5" in model or "o1" in model or "o3" in model
-```
-
-#### 3. "Temperature does not support 0.7"
-
-**Problem**: New models only support default temperature.
-
-**Solution**: System automatically omits temperature for new models. No action needed.
-
-#### 4. SNS-Vibe Connection Failed
-
-**Problem**: Cannot connect to `http://localhost:8383`
-
-**Solutions**:
-- Verify SNS-Vibe is running: `curl http://localhost:8383`
-- Check port 8383 is not in use: `lsof -i :8383`
-- Restart SNS-Vibe: `cd sns-vibe && npm run dev -- --port 8383`
-
-#### 5. Playwright Browser Not Installed
-
-**Problem**: `playwright._impl._api_types.Error: Executable doesn't exist`
-
-**Solution**:
-```bash
-uv run playwright install chromium
-```
-
-#### 6. Too Many Concurrent Agents
-
-**Problem**: System slows down or crashes with many agents.
-
-**Solutions**:
-- Reduce `--num-agents`: `uv run python local_agent.py --num-agents 2`
-- Use headless mode (default) instead of `--all-headed`
-
-### Debug Mode
-
-Enable verbose logging:
-
-```bash
-# Set log level in .env
-AGENT_LOG_LEVEL=DEBUG
-
-# Or use environment variable
-AGENT_LOG_LEVEL=DEBUG uv run python local_agent.py
-```
-
-### Viewing Logs
-
-```bash
-# View agent action logs
-tail -f search-dashboard/public/simulation/*.jsonl
-
-# Pretty-print JSONL
-cat search-dashboard/public/simulation/*.jsonl | jq
-```
-
-## Development
-
-### Adding New Actions
-
-Edit `local_agent.py:_execute_action()`:
-
-```python
-async def _execute_action(self, decision: ActionDecision) -> dict[str, Any]:
-    action = decision.action
-
-    if action == "your_new_action":
-        # Implement action logic
-        await page.click("#your-selector")
-        return {
-            "action": action,
-            "success": True,
-        }
-```
-
-Update decision prompt in `_get_decision()` to include new action.
-
-### Custom Personas
-
-Create a JSON file with persona definitions:
-
-```json
-[
-  {
-    "name": "FitnessEnthusiast",
-    "interests": ["health", "fitness", "nutrition"],
-    "behavior": "active",
-    "bias": "positive"
-  }
-]
-```
-
-Update `sns-vibe/seeds/personas.json` (used by `local_agent.py`) to include your custom personas:
-```bash
-cp custom_personas.json ../sns-vibe/seeds/personas.json
-```
-
-### Extending the Swarm
-
-See `local_agent.py:run_local_agents_parallel()` for the orchestration logic. Key extension points:
-
-- **Pre-run hooks**: Add setup logic before agent execution
-- **Post-run hooks**: Add cleanup or aggregation logic
-- **Custom metrics**: Modify result aggregation
-- **Agent lifecycle**: Customize agent creation and configuration
-
-### Testing Changes
-
-```bash
-# Test with small swarm
-uv run python local_agent.py --num-agents 2 --max-steps 5
-```
-
-### Code Structure
-
-```
-agent/
-├── local_agent.py       # Core local Playwright agent
-├── runner.py            # Multi-agent orchestration
-├── cli.py               # Legacy command-line interface
-├── single_agent.py      # Legacy single-agent runner
-├── accounts.py          # Account management
-├── run_all.sh           # Legacy total solution script
-├── .env                 # Configuration
-├── personas.json        # Default personas
-└── output/              # Local artifacts (optional)
-```
-
-## Account Management
-
-Default seed accounts are documented in `agent/ACCOUNTS.md`. Override with `SNS_EMAIL` environment variable.
-
-## Related Documentation
-
-- **SNS-Vibe**: `../sns-vibe/README.md` - Local social network platform
-- **Shared Contracts**: `../shared/README.md` - Data schemas and contracts
-- **Project Overview**: `../README.md` - Top-level project documentation
-
-## Support
-
-For issues or questions:
-1. Check [Troubleshooting](#troubleshooting) section
-2. Review logs in `search-dashboard/public/simulation/`
-3. Enable debug mode with `AGENT_LOG_LEVEL=DEBUG`
-
-## License
-
-See project root LICENSE file.
+- Project overview: `../README.md`
+- Shared schemas: `../shared/README.md`
+- Lightweight SNS: `../sns-vibe/README.md`

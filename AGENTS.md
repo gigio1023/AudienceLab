@@ -27,7 +27,7 @@
 |-----------|------|------------|
 | `sns/` | 로컬 SNS 플랫폼 (시뮬레이션 스테이지) | Pixelfed, Docker, MySQL, Redis |
 | `agent/` | 페르소나 기반 브라우저 에이전트 | Python, Playwright, OpenAI Computer Use API |
-| `search-dashboard/` | 시뮬레이션 + 보고 UI (검색은 사전 완료 가정) | React, TypeScript, Vite |
+| `dashboard/` | 시뮬레이션 + 보고 UI (검색은 사전 완료 가정) | React, TypeScript, Vite |
 | `insta-crawler/` | Instagram 크롤러 + 데이터셋 도구 | Python, Playwright, SQLite |
 | `shared/` | 파일 기반 교환 (스키마, 시뮬레이션 결과) | JSON Schema |
 | `context/` | 연구 노트 (참조 전용) | Markdown |
@@ -43,8 +43,8 @@
 - 대시보드는 공유 폴더를 폴링하여 시뮬레이션 출력을 읽습니다 (`shared/README.md` 참조).
 
 ### 에이전트 활동 로그 (JSONL)
-- 에이전트별 JSONL 로그를 `search-dashboard/public/simulation/*.jsonl`에 append 합니다.
-- `index.json`이 존재하면 대시보드는 해당 파일 목록을 기준으로 폴링합니다.
+- 에이전트별 JSONL 로그를 `dashboard/public/simulation/*.jsonl`에 append 합니다.
+- `__files.json`이 존재하면 대시보드는 해당 파일 목록을 기준으로 폴링합니다.
 - 스펙은 `docs/contracts/simulation.md`와 `docs/components/dashboard.md`를 참조합니다.
 
 ## Agent Skills
@@ -89,7 +89,7 @@ Comment (Tier 2+): comment_id, shortcode, owner_username, created_at, text, fetc
 4. 회사 쿼리의 경우, 후보 인플루언서를 선택하고 캠페인 시뮬레이션 구성.
 5. 페르소나 기반 팔로워 에이전트(`agent/`)를 실행하여 Pixelfed에서 반응 시뮬레이션.
 6. 로그 및 메트릭 집계, 과거 참여 데이터와 비교 (Tier 1+).
-7. 대시보드(`search-dashboard/`)에서 사전 선별된 리스트로 시뮬레이션 및 보고 흐름 표시.
+7. 대시보드(`dashboard/`)에서 사전 선별된 리스트로 시뮬레이션 및 보고 흐름 표시.
 
 ---
 
@@ -236,7 +236,7 @@ docker exec pixelfed-app php artisan <command>
 
 ---
 
-### Search Dashboard (`search-dashboard/`)
+### Dashboard (`dashboard/`)
 
 사전 선별된 인플루언서 리스트를 가정하고 바로 시뮬레이션을 실행해 캠페인 성과를 추정하는 시뮬레이션 + 보고 대시보드 프론트엔드를 구축합니다. 검색 UI는 범위 밖이며, 결과가 이미 준비된 상태에서 시작합니다.
 
@@ -463,7 +463,7 @@ Instagram에서 인플루언서/팔로워 데이터를 수집하는 크롤러와
 
 ## 개발 가이드라인
 
-- **벤더 디렉토리 확인 (중요)**: 작업을 시작하기 전에 `search-dashboard/vendor/react-bits`와 `search-dashboard/vendor/shadcn-ui`가 존재하는지 확인하십시오. 없으면 해당 레포를 clone하여 참조합니다.
+- **벤더 디렉토리 확인 (중요)**: 작업을 시작하기 전에 `dashboard/vendor/react-bits`와 `dashboard/vendor/shadcn-ui`가 존재하는지 확인하십시오. 없으면 해당 레포를 clone하여 참조합니다.
 - 컴포넌트별 기존 스택 및 도구를 따르십시오(README, package.json, pyproject, docker-compose 확인).
 - 변경 사항을 작고 집중적으로 유지합니다; 필요한 경우가 아니면 컴포넌트 간 결합을 피합니다.
 - 컴포넌트 간 명시적인 데이터 계약으로 타이핑된 인터페이스를 선호합니다.
@@ -490,7 +490,7 @@ Instagram에서 인플루언서/팔로워 데이터를 수집하는 크롤러와
 - 공유 계약: `shared/README.md`, `shared/simulation-schema.json`
 - 로컬 SNS 설정: `docs/components/sns.md`
 - 에이전트 시뮬레이션: `agent/README.md`, `agent/AGENTS.md`
-- 대시보드 UX: `search-dashboard/README.md`, `search-dashboard/AGENTS.md`
+- 대시보드 UX: `dashboard/README.md`
 - Instagram 크롤러: `insta-crawler/README.md`, `insta-crawler/PLANS.md`, `insta-crawler/AGENTS.md`
 - 이전 노트: `context/subject.md`, `context/simulation.md`, `context/eval.md`
 

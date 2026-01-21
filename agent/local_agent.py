@@ -205,9 +205,9 @@ def load_local_config(
     agent_dir = Path(__file__).resolve().parent
     load_dotenv(agent_dir / ".env")
 
-    # Default output to search-dashboard/public/simulation for live dashboard
+    # Default output to dashboard/public/simulation for live dashboard
     if output_dir is None:
-        output_dir = agent_dir.parent / "search-dashboard" / "public" / "simulation"
+        output_dir = agent_dir.parent / "dashboard" / "public" / "simulation"
 
     return LocalAgentConfig(
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),

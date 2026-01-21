@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Absolute paths
 SOURCE_DIR = Path("/Users/user/git/AudienceLab/agent/outputs/multi_agent_test")
-TARGET_DIR = Path("/Users/user/git/AudienceLab/search-dashboard/public/simulation")
+TARGET_DIR = Path("/Users/user/git/AudienceLab/dashboard/public/simulation")
 IMAGES_DIR = TARGET_DIR / "images"
 
 def main():
@@ -87,13 +87,14 @@ def main():
             
         agent_files.append(f"{agent_id}.jsonl")
 
-    # Update index.json
+    # Update feed index (legacy + dashboard hook)
     index_data = {
         "updated_at": datetime.now().isoformat(),
         "files": agent_files
     }
-    with open(TARGET_DIR / "index.json", 'w') as f:
-        json.dump(index_data, f, indent=2)
+    for name in ["index.json", "__files.json"]:
+        with open(TARGET_DIR / name, 'w') as f:
+            json.dump(index_data, f, indent=2)
         
     print(f"Deployed {len(agent_files)} agent feeds.")
 

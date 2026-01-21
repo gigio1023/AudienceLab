@@ -1,96 +1,63 @@
 # SNS-Vibe
 
-An ultra-lightweight, agent-friendly social media simulation platform built for the AudienceLab hackathon. It replaces the complex Pixelfed deployment with a streamlined, controllable environment.
+Lightweight, agent-friendly social media simulation platform built for fast iteration during the hackathon. It serves as a controllable alternative to the heavier Pixelfed stack in `sns/`.
 
-## 🏗 Technology Stack
+## Why This Exists
 
-- **Framework**: [SvelteKit](https://kit.svelte.dev/) (Full-stack SSR/API)
-- **Language**: TypeScript
-- **Styling**: [TailwindCSS](https://tailwindcss.com/)
-- **UI Components**: [shadcn-svelte](https://www.shadcn-svelte.com/) (Bits UI)
-- **Database**: SQLite ([better-sqlite3](https://github.com/WiseLibs/better-sqlite3))
-- **Deployment**: Docker (Node 20-alpine)
+- Simple login flow for automated agents
+- Predictable DOM IDs for Playwright selectors
+- Local SQLite storage with deterministic seed data
 
-## 🌟 Key Features
-
-### Agent-First Design
-- **No Complex Auth**: Simple username-based login. No passwords, emails, or 2FA.
-- **Predictable DOM**: All interactive elements have semantic IDs (e.g., `#like-button-123`).
-- **Big Click Targets**: Buttons are sized appropriately for automated agents (Playwright/Puppeteer).
-- **Optimized Flows**: No modals, no "load more" buttons (infinite scroll or pagination handled simply), direct interactions.
-
-### Simulation Capabilities
-- **Seeded Data**: Pre-loaded with 10 Agent personas and 1 Influencer persona.
-- **Feed Logic**: Shows posts from followed users + self.
-- **Interactions**:
-  - **Like/Unlike**: Instant toggle.
-  - **Comment**: Threaded under posts.
-  - **Follow/Unfollow**: manages feed content.
-
-
-## 📁 Project Structure
+## Quick Start (Local Dev)
 
 ```bash
-sns-vibe/
-├── src/
-│   ├── lib/
-│   │   ├── components/ui/  # shadcn-svelte components
-│   │   ├── server/
-│   │   │   ├── db.ts       # SQLite connection & Schema init
-│   │   │   └── seed.ts     # Data seeding logic
-│   ├── routes/
-│   │   ├── +page.svelte        # Login Page
-│   │   ├── +page.server.ts     # Auth Actions
-│   │   └── feed/
-│   │       ├── +page.svelte    # Main Feed UI
-│   │       └── +page.server.ts # Feed Data & Actions
-├── static/
-├── seeds.json          # Initial simulation data
-├── Dockerfile          # Production container definition
-├── docker-compose.yml  # Orchestration
-└── package.json
+npm install
+bash scripts/reset-db.sh
+npm run dev -- --port 8383
 ```
 
-## 🚀 Getting Started
+Set `SNS_URL=http://localhost:8383` in `agent/.env`.
 
-### Local Development
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Reset the database (required for a clean dev run):
-   ```bash
-   bash scripts/reset-db.sh
-   ```
-
-3. Seed the database (optional, happens on app start if check added, currently manual script):
-   ```bash
-   npx tsx src/lib/server/seed.ts
-   ```
-
-4. Start dev server:
-   ```bash
-   npm run dev
-   ```
-
-### Docker Deployment
-
-The preferred way to run in the hackathon environment.
+## Docker (Optional)
 
 ```bash
 docker-compose up --build -d
 ```
 
-- Accessible at: `http://localhost:8383` (Mapped from internal 8080)
+Default mapping: `http://localhost:8383`
 
-## 🗄 Database Schema
+## Data and Seeding
 
-All data is stored in a local `sns.db` SQLite file.
+- SQLite database file: `sns.db`
+- Seed files: `seeds/*.json`
+- Manual seed run:
+  ```bash
+  npx tsx src/lib/server/seed.ts
+  ```
 
-- **Users**: `id`, `username`, `display_name`
-- **Posts**: `id`, `user_id`, `content`, `image_url`, `created_at`
-- **Likes**: `user_id`, `post_id` (Unique constraint)
-- **Comments**: `id`, `user_id`, `post_id`, `content`
-- **Follows**: `follower_id`, `following_id`
+## DOM Conventions for Automation
+
+The UI includes stable IDs for agent automation:
+
+- Like button: `#like-button-{postId}`
+- Comment input: `#comment-input-{postId}`
+- Comment submit: `#comment-button-{postId}`
+
+If you change the UI, keep these selectors or update the agent code in `agent/local_agent.py`.
+
+## Project Structure (High Level)
+
+```
+sns-vibe/
+├── src/
+│   ├── lib/server/   # SQLite + seeding
+│   └── routes/       # Login + feed UI
+├── seeds/            # Seed JSON files
+├── scripts/          # Reset/seed helpers
+└── sns.db            # Local database (generated)
+```
+
+## Related Docs
+
+- Agent simulator: `../agent/README.md`
+- Project overview: `../README.md`
