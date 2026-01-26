@@ -14,6 +14,23 @@ Hackathon context: **OpenAI Coxwave Hackathon, Seoul (January 2026)**. This repo
 
 Closed loop: **data → personas → simulation → metrics → ranking + rationale**
 
+## System Architecture
+
+```mermaid
+graph TD
+    Shortlist[Pre-selected Shortlist] --> Dashboard["Dashboard (React + Vite)"]
+    Dashboard -->|Configure run| AgentCLI["Agent CLI / Runner"]
+    AgentCLI -->|Playwright| SNS["SNS-Vibe (SvelteKit + SQLite)"]
+    AgentCLI -->|LLM decisions| OpenAI["OpenAI API"]
+    AgentCLI --> Shared["shared/simulation/*.json"]
+    AgentCLI --> Logs["dashboard/public/simulation/*.jsonl"]
+    Shared --> Dashboard
+    Logs --> Dashboard
+    Shared --> Eval["eval-agent"]
+    Logs --> Eval
+    Eval --> EvalOut["dashboard/public/evaluation/latest.json"]
+```
+
 ## Repository Layout
 
 | Path | Role |
