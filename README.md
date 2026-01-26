@@ -19,11 +19,20 @@ Closed loop: **data → personas → simulation → metrics → ranking + ration
 ```mermaid
 graph TD
     Shortlist[Pre-selected Shortlist] --> Dashboard["Dashboard (React + Vite)"]
-    Dashboard -->|Configure run| AgentCLI["Agent CLI / Runner"]
-    AgentCLI -->|Playwright| SNS["SNS-Vibe (SvelteKit + SQLite)"]
-    AgentCLI -->|LLM decisions| OpenAI["OpenAI API"]
-    AgentCLI --> Shared["shared/simulation/*.json"]
-    AgentCLI --> Logs["dashboard/public/simulation/*.jsonl"]
+    Dashboard -->|Configure run| Orchestrator["Agent Orchestrator / Runner"]
+
+    subgraph Swarm["Follower Persona Swarm (N agents)"]
+        AgentA["Agent A"] --> SNS["SNS-Vibe (SvelteKit + SQLite)"]
+        AgentB["Agent B"] --> SNS
+        AgentN["Agent N"] --> SNS
+    end
+
+    Orchestrator -->|Spawns| AgentA
+    Orchestrator -->|Spawns| AgentB
+    Orchestrator -->|Spawns| AgentN
+    Orchestrator -->|LLM decisions| OpenAI["OpenAI API"]
+    Orchestrator --> Shared["shared/simulation/*.json"]
+    Orchestrator --> Logs["dashboard/public/simulation/*.jsonl"]
     Shared --> Dashboard
     Logs --> Dashboard
     Shared --> Eval["eval-agent"]
